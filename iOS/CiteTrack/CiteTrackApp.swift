@@ -546,7 +546,8 @@ struct MainView: View {
     @StateObject private var badgeCountManager = BadgeCountManager.shared
     @EnvironmentObject private var initializationService: AppInitializationService
     @State private var contributionData: [Double] = []
-    
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     init() {
         // 记录应用打开行为
         // UserBehaviorManager.shared.recordAppOpen()
@@ -719,37 +720,42 @@ struct MainView: View {
     
     // 不再使用热力图测试的初始化模拟数据
 
-    var body: some View {
-        Group {
-            if initializationService.isFirstLaunch && initializationService.isInitializing {
-                InitializationView()
-            } else {
-                TabView(selection: $selectedTab) {
+    // MARK: - Sidebar items for iPad
+    private var sidebarItems: [(String, String, String, Int)] {
+        let lm = localizationManager
+        return [
+            ("chart.bar.fill",       lm.localized("dashboard"),         "dashboard",         0),
+            ("person.2.fill",        lm.localized("scholars"),          "scholars",          1),
+            ("chart.xyaxis.line",    lm.localized("charts"),            "charts",            2),
+            ("quote.bubble.fill",    lm.localized("who_cite_me"),       "who_cite_me",       3),
+            ("text.magnifyingglass", lm.localized("citation_insights"), "citation_insights", 4),
+            ("gear",                 lm.localized("settings"),          "settings",          5),
+        ]
+    }
+
+    @ViewBuilder
+    private func contentView(for tab: Int) -> some View {
+        switch tab {
+        case 0:
             DashboardView()
-                .toolbar(.hidden, for: .tabBar)
                 .analyticsScreen(AnalyticsScreen.dashboard)
-                .tabItem { Label("", systemImage: "chart.bar.fill") }
-                .tag(0)
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("iCloudImportPromptAvailable"))) { _ in
                     if iCloudSyncManager.shared.showImportPrompt == true {
                         iCloudSyncManager.shared.showImportPrompt = true
                     }
                 }
-
+        case 1:
             NewScholarView()
-                .toolbar(.hidden, for: .tabBar)
                 .analyticsScreen(AnalyticsScreen.scholars)
-                .tabItem { Label("", systemImage: "person.2.fill") }
-                .tag(1)
-
+        case 2:
             NavigationView {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(spacing: 12) {
                         ScholarsGrowthLineChartView()
                             .environmentObject(DataManager.shared)
                             .environmentObject(localizationManager)
-                            .frame(maxHeight: 450)
-                            .frame(minHeight: 440)
+                            .frame(maxHeight: horizontalSizeClass == .regular ? 600 : 450)
+                            .frame(minHeight: horizontalSizeClass == .regular ? 500 : 440)
                         contributionChartSection
                     }
                     .padding(.horizontal)
@@ -760,25 +766,79 @@ struct MainView: View {
                 .navigationBarTitleDisplayMode(.large)
             }
             .navigationViewStyle(StackNavigationViewStyle())
-            .toolbar(.hidden, for: .tabBar)
-            .tabItem { Label("", systemImage: "chart.xyaxis.line") }
-            .tag(2)
-
+        case 3:
             WhoCiteMeView()
-                .toolbar(.hidden, for: .tabBar)
                 .analyticsScreen(AnalyticsScreen.whoCiteMe)
+        case 4:
+            CitationInsightsView()
+        case 5:
+            SettingsView()
+                .analyticsScreen(AnalyticsScreen.settings)
+        default:
+            DashboardView()
+        }
+    }
+
+    // MARK: - iPad Sidebar Layout
+    @State private var sidebarSelection: Int? = 0
+
+    private var iPadSidebarView: some View {
+        NavigationSplitView {
+            List(selection: $sidebarSelection) {
+                ForEach(sidebarItems, id: \.3) { icon, title, _, tag in
+                    Label {
+                        Text(title)
+                    } icon: {
+                        Image(systemName: icon)
+                    }
+                    .tag(tag)
+                    .badge(tag == 3 && badgeCountManager.count > 0 ? badgeCountManager.count : 0)
+                }
+            }
+            .navigationTitle("CiteTrack")
+            .listStyle(.sidebar)
+            .onChange(of: sidebarSelection) { _, newValue in
+                if let newValue { selectedTab = newValue }
+            }
+            .onChange(of: selectedTab) { _, newValue in
+                sidebarSelection = newValue
+            }
+        } detail: {
+            contentView(for: selectedTab)
+        }
+    }
+
+    // MARK: - iPhone Tab Bar Layout
+    private var iPhoneTabView: some View {
+        TabView(selection: $selectedTab) {
+            contentView(for: 0)
+                .toolbar(.hidden, for: .tabBar)
+                .tabItem { Label("", systemImage: "chart.bar.fill") }
+                .tag(0)
+
+            contentView(for: 1)
+                .toolbar(.hidden, for: .tabBar)
+                .tabItem { Label("", systemImage: "person.2.fill") }
+                .tag(1)
+
+            contentView(for: 2)
+                .toolbar(.hidden, for: .tabBar)
+                .tabItem { Label("", systemImage: "chart.xyaxis.line") }
+                .tag(2)
+
+            contentView(for: 3)
+                .toolbar(.hidden, for: .tabBar)
                 .tabItem { Label("", systemImage: "quote.bubble") }
                 .badge(badgeCountManager.count)
                 .tag(3)
 
-            CitationInsightsView()
+            contentView(for: 4)
                 .toolbar(.hidden, for: .tabBar)
                 .tabItem { Label("", systemImage: "text.magnifyingglass") }
                 .tag(4)
 
-            SettingsView()
+            contentView(for: 5)
                 .toolbar(.hidden, for: .tabBar)
-                .analyticsScreen(AnalyticsScreen.settings)
                 .tabItem { Label("", systemImage: "gear") }
                 .tag(5)
         }
@@ -791,21 +851,33 @@ struct MainView: View {
             .background(.bar)
             .ignoresSafeArea(edges: .bottom)
         }
-                .onChange(of: selectedTab) { _, newTab in
-                    AnalyticsService.shared.log(AnalyticsEventName.tabSelected, parameters: [
-                        AnalyticsParamKey.tabName: AnalyticsTabName.from(index: newTab)
-                    ])
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .deepLinkAddScholar)) { _ in
-                    selectedTab = 1 // 切换到学者管理页面
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .deepLinkScholars)) { _ in
-                    selectedTab = 1 // 切换到学者管理页面
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .deepLinkDashboard)) { _ in
-                    selectedTab = 0 // 切换到仪表板页面
+    }
+
+    var body: some View {
+        Group {
+            if initializationService.isFirstLaunch && initializationService.isInitializing {
+                InitializationView()
+            } else {
+                if horizontalSizeClass == .regular {
+                    iPadSidebarView
+                } else {
+                    iPhoneTabView
                 }
             }
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            AnalyticsService.shared.log(AnalyticsEventName.tabSelected, parameters: [
+                AnalyticsParamKey.tabName: AnalyticsTabName.from(index: newTab)
+            ])
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .deepLinkAddScholar)) { _ in
+            selectedTab = 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .deepLinkScholars)) { _ in
+            selectedTab = 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .deepLinkDashboard)) { _ in
+            selectedTab = 0
         }
     }
 }
@@ -1043,6 +1115,7 @@ struct DashboardView: View {
             }
             .navigationTitle(localizationManager.localized("dashboard_title"))
         }
+        .navigationViewStyle(.stack)
     }
 }
 
@@ -1346,6 +1419,7 @@ struct NewScholarView: View {
                 }
             )
         }
+        .navigationViewStyle(.stack)
     }
 
     private var emptyStateView: some View {
@@ -2115,8 +2189,9 @@ struct SettingsView: View {
                 Button(localizationManager.localized("confirm")) { }
             }
         }
+        .navigationViewStyle(.stack)
     }
-    
+
     private func clearAllCache() {
         AnalyticsService.shared.log(AnalyticsEventName.settingsCacheCleared)
         print("🗑️ [Settings] Clearing all cache...")

@@ -30,6 +30,7 @@ struct CitationInsightsView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
         .sheet(isPresented: $showSignIn) {
             GoogleSignInView { refreshContexts() }
         }

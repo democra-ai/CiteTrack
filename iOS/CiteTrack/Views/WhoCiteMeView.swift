@@ -293,6 +293,7 @@ struct WhoCiteMeView: View {
                 citedPublicationsSheetView
             }
         }
+        .navigationViewStyle(.stack)
         .onAppear {
             if selectedScholar == nil {
                 // 优先选择 "it's me" 的学者，否则选择第一个
