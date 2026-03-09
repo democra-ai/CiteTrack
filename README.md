@@ -1,5 +1,9 @@
 <div align="center">
 
+  <img src="macOS/assets/logo.png" alt="CiteTrack" width="128" height="128">
+
+  <br><br>
+
   <img src="macOS/assets/banner.svg" alt="CiteTrack — Track your academic impact across Apple devices" width="100%">
 
   <br><br>
