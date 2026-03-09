@@ -17,7 +17,7 @@ class ModernChartsWindowController: NSWindowController {
 
     private func setupModernWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 780),
+            contentRect: NSRect(x: 0, y: 0, width: 1440, height: 900),
             styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -26,7 +26,7 @@ class ModernChartsWindowController: NSWindowController {
         window.center()
         window.title = "CiteTrack"
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 900, height: 620)
+        window.minSize = NSSize(width: 1000, height: 700)
         window.titlebarAppearsTransparent = true
         window.backgroundColor = .controlBackgroundColor
 

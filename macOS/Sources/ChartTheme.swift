@@ -25,86 +25,79 @@ enum ChartTheme: String, CaseIterable {
         switch self {
         case .academic:
             return ChartColorPalette(
-                // Deep slate blue — desaturated, not neon
-                primary: NSColor(hex: "#3B6B9A"),
-                secondary: NSColor(hex: "#6B9DC2"),
-                accent: NSColor(hex: "#C47D2E"),
-                success: NSColor(hex: "#3D8B5E"),
-                warning: NSColor(hex: "#C47D2E"),
-                error: NSColor(hex: "#B84A3C"),
-                // Off-white background, never pure white
-                background: NSColor(hex: "#F5F5F3"),
-                surface: NSColor(hex: "#FAFAF8"),
-                onPrimary: NSColor(hex: "#FAFAF8"),
-                onSurface: NSColor(hex: "#1A1A1A"),
-                // Warm gray grid, not cold
-                gridLines: NSColor(hex: "#E5E3DF"),
-                // Off-black text, never pure black
-                textPrimary: NSColor(hex: "#1C1C1E"),
-                textSecondary: NSColor(hex: "#6E6E73"),
-                // Tinted border for depth
-                border: NSColor(hex: "#D8D6D0"),
-                // Card background slightly elevated from surface
+                primary: NSColor(hex: "#2E86C1"),
+                secondary: NSColor(hex: "#5DADE2"),
+                accent: NSColor(hex: "#F39C12"),
+                success: NSColor(hex: "#27AE60"),
+                warning: NSColor(hex: "#E67E22"),
+                error: NSColor(hex: "#E74C3C"),
+                background: NSColor(hex: "#F8F9FA"),
+                surface: NSColor(hex: "#FFFFFF"),
+                onPrimary: NSColor.white,
+                onSurface: NSColor(hex: "#2C3E50"),
+                gridLines: NSColor(hex: "#E8E8E8"),
+                textPrimary: NSColor(hex: "#2C3E50"),
+                textSecondary: NSColor(hex: "#7F8C8D"),
+                border: NSColor(hex: "#DEE2E6"),
                 cardBackground: NSColor(hex: "#FFFFFF"),
-                // Subtle tinted shadow color
-                shadowColor: NSColor(hex: "#3B6B9A")
+                shadowColor: NSColor(hex: "#2E86C1")
             )
         case .nature:
             return ChartColorPalette(
-                primary: NSColor(hex: "#3D7A5E"),
-                secondary: NSColor(hex: "#6BA88A"),
-                accent: NSColor(hex: "#B8963E"),
-                success: NSColor(hex: "#3D8B5E"),
-                warning: NSColor(hex: "#C47D2E"),
-                error: NSColor(hex: "#B84A3C"),
-                background: NSColor(hex: "#F4F6F3"),
-                surface: NSColor(hex: "#F9FAF8"),
-                onPrimary: NSColor(hex: "#FAFAF8"),
-                onSurface: NSColor(hex: "#1A1A1A"),
-                gridLines: NSColor(hex: "#DFE5DD"),
-                textPrimary: NSColor(hex: "#1C1C1E"),
-                textSecondary: NSColor(hex: "#5D6E5D"),
-                border: NSColor(hex: "#D0D8CE"),
+                primary: NSColor(hex: "#27AE60"),
+                secondary: NSColor(hex: "#58D68D"),
+                accent: NSColor(hex: "#F4D03F"),
+                success: NSColor(hex: "#2ECC71"),
+                warning: NSColor(hex: "#F39C12"),
+                error: NSColor(hex: "#E74C3C"),
+                background: NSColor(hex: "#F7F9F7"),
+                surface: NSColor(hex: "#FFFFFF"),
+                onPrimary: NSColor.white,
+                onSurface: NSColor(hex: "#1B4F72"),
+                gridLines: NSColor(hex: "#E8F5E8"),
+                textPrimary: NSColor(hex: "#1B4F72"),
+                textSecondary: NSColor(hex: "#5D6D5D"),
+                border: NSColor(hex: "#D5E8D4"),
                 cardBackground: NSColor(hex: "#FFFFFF"),
-                shadowColor: NSColor(hex: "#3D7A5E")
+                shadowColor: NSColor(hex: "#27AE60")
             )
         case .warm:
             return ChartColorPalette(
-                primary: NSColor(hex: "#B86830"),
-                secondary: NSColor(hex: "#D4956A"),
-                accent: NSColor(hex: "#6B4D8A"),
-                success: NSColor(hex: "#3D8B5E"),
-                warning: NSColor(hex: "#C47D2E"),
-                error: NSColor(hex: "#9E3A2E"),
-                background: NSColor(hex: "#F7F4F0"),
-                surface: NSColor(hex: "#FAFAF8"),
-                onPrimary: NSColor(hex: "#FAFAF8"),
-                onSurface: NSColor(hex: "#1A1A1A"),
-                gridLines: NSColor(hex: "#E8E2DA"),
-                textPrimary: NSColor(hex: "#2C1810"),
-                textSecondary: NSColor(hex: "#7A6458"),
-                border: NSColor(hex: "#DDD6CC"),
+                primary: NSColor(hex: "#E67E22"),
+                secondary: NSColor(hex: "#F8C471"),
+                accent: NSColor(hex: "#8E44AD"),
+                success: NSColor(hex: "#27AE60"),
+                warning: NSColor(hex: "#F39C12"),
+                error: NSColor(hex: "#C0392B"),
+                background: NSColor(hex: "#FDF6F0"),
+                surface: NSColor(hex: "#FFFFFF"),
+                onPrimary: NSColor.white,
+                onSurface: NSColor(hex: "#922B21"),
+                gridLines: NSColor(hex: "#F8E6D8"),
+                textPrimary: NSColor(hex: "#922B21"),
+                textSecondary: NSColor(hex: "#A04000"),
+                border: NSColor(hex: "#F0D9C8"),
                 cardBackground: NSColor(hex: "#FFFFFF"),
-                shadowColor: NSColor(hex: "#B86830")
+                shadowColor: NSColor(hex: "#E67E22")
             )
         case .mono:
             return ChartColorPalette(
-                primary: NSColor(hex: "#3A3A3C"),
-                secondary: NSColor(hex: "#8E8E93"),
-                accent: NSColor(hex: "#3B6B9A"),
-                success: NSColor(hex: "#3D8B5E"),
-                warning: NSColor(hex: "#C47D2E"),
-                error: NSColor(hex: "#B84A3C"),
-                background: NSColor(hex: "#F5F5F5"),
-                surface: NSColor(hex: "#FAFAFA"),
-                onPrimary: NSColor(hex: "#FAFAFA"),
-                onSurface: NSColor(hex: "#1C1C1E"),
+                primary: NSColor(hex: "#2C3E50"),
+                secondary: NSColor(hex: "#7F8C8D"),
+                accent: NSColor(hex: "#3498DB"),
+                success: NSColor(hex: "#2ECC71"),
+                warning: NSColor(hex: "#F39C12"),
+                error: NSColor(hex: "#E74C3C"),
+                background: NSColor(hex: "#FAFAFA"),
+                surface: NSColor(hex: "#FFFFFF"),
+                onPrimary: NSColor.white,
+                onSurface: NSColor(hex: "#2C3E50"),
                 gridLines: NSColor(hex: "#E5E5E5"),
-                textPrimary: NSColor(hex: "#1C1C1E"),
-                textSecondary: NSColor(hex: "#6E6E73"),
+                textPrimary: NSColor(hex: "#2C3E50"),
+                textSecondary: NSColor(hex: "#7F8C8D"),
                 border: NSColor(hex: "#D1D1D6"),
                 cardBackground: NSColor(hex: "#FFFFFF"),
-                shadowColor: NSColor(hex: "#3A3A3C")
+                shadowColor: NSColor(hex: "#2C3E50")
             )
         case .auto:
             if NSApp.effectiveAppearance.name == .darkAqua {
@@ -117,43 +110,43 @@ enum ChartTheme: String, CaseIterable {
 
     private var lightTheme: ChartColorPalette {
         return ChartColorPalette(
-            primary: NSColor(hex: "#3B6B9A"),
-            secondary: NSColor(hex: "#6B9DC2"),
-            accent: NSColor(hex: "#C47D2E"),
-            success: NSColor(hex: "#3D8B5E"),
-            warning: NSColor(hex: "#C47D2E"),
-            error: NSColor(hex: "#B84A3C"),
-            background: NSColor(hex: "#F5F5F3"),
-            surface: NSColor(hex: "#FAFAF8"),
-            onPrimary: NSColor(hex: "#FAFAF8"),
-            onSurface: NSColor(hex: "#1C1C1E"),
-            gridLines: NSColor(hex: "#E5E3DF"),
-            textPrimary: NSColor(hex: "#1C1C1E"),
-            textSecondary: NSColor(hex: "#6E6E73"),
-            border: NSColor(hex: "#D8D6D0"),
-            cardBackground: NSColor(hex: "#FFFFFF"),
-            shadowColor: NSColor(hex: "#3B6B9A")
+            primary: NSColor.systemBlue,
+            secondary: NSColor.systemTeal,
+            accent: NSColor.systemOrange,
+            success: NSColor.systemGreen,
+            warning: NSColor.systemYellow,
+            error: NSColor.systemRed,
+            background: NSColor.controlBackgroundColor,
+            surface: NSColor.controlBackgroundColor,
+            onPrimary: NSColor.white,
+            onSurface: NSColor.labelColor,
+            gridLines: NSColor.separatorColor,
+            textPrimary: NSColor.labelColor,
+            textSecondary: NSColor.secondaryLabelColor,
+            border: NSColor.separatorColor,
+            cardBackground: NSColor.controlBackgroundColor,
+            shadowColor: NSColor.systemBlue
         )
     }
 
     private var darkTheme: ChartColorPalette {
         return ChartColorPalette(
-            primary: NSColor(hex: "#6B9DC2"),
-            secondary: NSColor(hex: "#3B6B9A"),
-            accent: NSColor(hex: "#D4956A"),
-            success: NSColor(hex: "#5AAF7A"),
-            warning: NSColor(hex: "#D4956A"),
-            error: NSColor(hex: "#D46B5E"),
-            background: NSColor(hex: "#1C1C1E"),
-            surface: NSColor(hex: "#2C2C2E"),
-            onPrimary: NSColor(hex: "#1C1C1E"),
-            onSurface: NSColor(hex: "#F5F5F3"),
-            gridLines: NSColor(hex: "#3A3A3C"),
-            textPrimary: NSColor(hex: "#F5F5F3"),
-            textSecondary: NSColor(hex: "#8E8E93"),
-            border: NSColor(hex: "#3A3A3C"),
-            cardBackground: NSColor(hex: "#2C2C2E"),
-            shadowColor: NSColor(hex: "#000000")
+            primary: NSColor.systemBlue,
+            secondary: NSColor.systemTeal,
+            accent: NSColor.systemOrange,
+            success: NSColor.systemGreen,
+            warning: NSColor.systemYellow,
+            error: NSColor.systemRed,
+            background: NSColor.controlBackgroundColor,
+            surface: NSColor.controlBackgroundColor,
+            onPrimary: NSColor.white,
+            onSurface: NSColor.labelColor,
+            gridLines: NSColor.separatorColor,
+            textPrimary: NSColor.labelColor,
+            textSecondary: NSColor.secondaryLabelColor,
+            border: NSColor.separatorColor,
+            cardBackground: NSColor.controlBackgroundColor,
+            shadowColor: NSColor.black
         )
     }
 }
