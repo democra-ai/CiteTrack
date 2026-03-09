@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0A1628"/>
+      <stop offset="50%" stop-color="#0F2847"/>
+      <stop offset="100%" stop-color="#0A1628"/>
+    </linearGradient>
+    <linearGradient id="blue1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2B7DE9"/>
+      <stop offset="100%" stop-color="#1B5FBF"/>
+    </linearGradient>
+    <linearGradient id="blue2" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4A9AF5"/>
+      <stop offset="100%" stop-color="#2B7DE9"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="400" fill="url(#bg)" rx="16"/>
+
+  <!-- Subtle grid dots -->
+  <g opacity="0.06">
+    <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1" fill="white"/>
+    </pattern>
+    <rect width="1200" height="400" fill="url(#dots)"/>
+  </g>
+
+  <!-- Decorative circles -->
+  <circle cx="100" cy="350" r="180" fill="#2B7DE9" opacity="0.04"/>
+  <circle cx="1100" cy="50" r="200" fill="#4A9AF5" opacity="0.04"/>
+
+  <!-- Infinity symbol (matching logo) -->
+  <g transform="translate(170, 130) scale(1.1)" filter="url(#glow)">
+    <!-- Left loop -->
+    <path d="M70 70 C70 31.3 101.3 0 140 0 C178.7 0 210 31.3 210 70 C210 108.7 178.7 140 140 140 C101.3 140 70 108.7 70 70 Z"
+          stroke="url(#blue1)" stroke-width="22" fill="none" stroke-linecap="round"/>
+    <!-- Right loop -->
+    <path d="M150 70 C150 31.3 181.3 0 220 0 C258.7 0 290 31.3 290 70 C290 108.7 258.7 140 220 140 C181.3 140 150 108.7 150 70 Z"
+          stroke="url(#blue2)" stroke-width="22" fill="none" stroke-linecap="round"/>
+    <!-- Overlap blend -->
+    <path d="M170 30 C190 60 190 80 170 110" stroke="#3D8EF0" stroke-width="22" fill="none" stroke-linecap="round" opacity="0.7"/>
+  </g>
+
+  <!-- App name -->
+  <text x="540" y="175" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif" font-size="72" font-weight="700" fill="white" letter-spacing="-1">CiteTrack</text>
+
+  <!-- Tagline -->
+  <text x="540" y="225" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="400" fill="#8BA4C7" letter-spacing="0.5">Track your academic impact across Apple devices</text>
+
+  <!-- Feature pills -->
+  <g transform="translate(540, 260)">
+    <rect x="0" y="0" width="130" height="32" rx="16" fill="#2B7DE9" opacity="0.15"/>
+    <text x="65" y="21" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" fill="#5BA0F5" text-anchor="middle">Google Scholar</text>
+
+    <rect x="145" y="0" width="90" height="32" rx="16" fill="#2B7DE9" opacity="0.15"/>
+    <text x="190" y="21" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" fill="#5BA0F5" text-anchor="middle">Citations</text>
+
+    <rect x="250" y="0" width="80" height="32" rx="16" fill="#2B7DE9" opacity="0.15"/>
+    <text x="290" y="21" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" fill="#5BA0F5" text-anchor="middle">Charts</text>
+
+    <rect x="345" y="0" width="90" height="32" rx="16" fill="#2B7DE9" opacity="0.15"/>
+    <text x="390" y="21" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" fill="#5BA0F5" text-anchor="middle">7 Languages</text>
+
+    <rect x="450" y="0" width="80" height="32" rx="16" fill="#2B7DE9" opacity="0.15"/>
+    <text x="490" y="21" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" fill="#5BA0F5" text-anchor="middle">iCloud</text>
+  </g>
+
+  <!-- Platform icons row -->
+  <g transform="translate(540, 315)" fill="#5B7A9E">
+    <!-- iPhone -->
+    <rect x="0" y="0" width="18" height="30" rx="4" stroke="#5B7A9E" stroke-width="1.5" fill="none"/>
+    <line x1="7" y1="25" x2="11" y2="25" stroke="#5B7A9E" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="26" y="20" font-family="-apple-system, sans-serif" font-size="14" font-weight="400" fill="#5B7A9E">iPhone</text>
+
+    <!-- iPad -->
+    <g transform="translate(100, 0)">
+      <rect x="0" y="2" width="24" height="28" rx="3" stroke="#5B7A9E" stroke-width="1.5" fill="none"/>
+      <circle cx="12" cy="25" r="2" stroke="#5B7A9E" stroke-width="1" fill="none"/>
+      <text x="32" y="20" font-family="-apple-system, sans-serif" font-size="14" font-weight="400" fill="#5B7A9E">iPad</text>
+    </g>
+
+    <!-- Mac -->
+    <g transform="translate(190, 0)">
+      <rect x="2" y="2" width="26" height="18" rx="2" stroke="#5B7A9E" stroke-width="1.5" fill="none"/>
+      <line x1="8" y1="24" x2="22" y2="24" stroke="#5B7A9E" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="15" y1="20" x2="15" y2="24" stroke="#5B7A9E" stroke-width="1.5"/>
+      <text x="36" y="20" font-family="-apple-system, sans-serif" font-size="14" font-weight="400" fill="#5B7A9E">Mac</text>
+    </g>
+  </g>
+</svg>
