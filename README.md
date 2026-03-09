@@ -1,23 +1,7 @@
 <div align="center">
 
-  <img src="macOS/assets/logo.png" alt="CiteTrack" width="128" height="128">
-
-  <br><br>
-
   <img src="macOS/assets/banner.svg" alt="CiteTrack — Track your academic impact across Apple devices" width="100%">
-
-  <br><br>
-
-  <a href="https://apps.apple.com/app/citetrack/id6752281652">
-    <img src="https://img.shields.io/badge/App_Store-Download-0D96F6?style=for-the-badge&logo=app-store&logoColor=white" alt="Download on the App Store">
-  </a>
-  &nbsp;
-  <a href="https://github.com/tao-shen/CiteTrack/releases/latest">
-    <img src="https://img.shields.io/badge/GitHub-Download_DMG-181717?style=for-the-badge&logo=github&logoColor=white" alt="Download DMG">
-  </a>
-
-  <br><br>
-
+  <br>
   <a href="https://github.com/tao-shen/CiteTrack/releases/latest"><img src="https://img.shields.io/github/v/release/tao-shen/CiteTrack?style=flat-square&color=blue&label=latest%20release" alt="Latest Release"></a>
   <a href="https://apps.apple.com/app/citetrack/id6752281652"><img src="https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS%20%7C%20macOS-blue?style=flat-square" alt="Platforms"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/tao-shen/CiteTrack?style=flat-square" alt="MIT License"></a>
@@ -32,82 +16,36 @@
 
 ---
 
-## Why CiteTrack?
+## <img src="macOS/assets/logo.png" alt="" width="28" height="28"> Why CiteTrack?
 
-For researchers, citation counts are more than vanity metrics — they measure the **real-world impact** of your work. Yet Google Scholar offers no native app, no push notifications, and no way to visualize trends over time.
+Google Scholar has no native app and no push notifications. **CiteTrack** is a native Apple app that tracks your citations, shows trends, and notifies you when numbers change — so you can focus on research.
 
-**CiteTrack fills that gap.** It's a native Apple app that turns raw Google Scholar data into actionable insights — so you can focus on research, not refreshing browser tabs.
-
-### What makes it different
-
-| | CiteTrack | Browser Bookmarks | Other Tools |
-|---|---|---|---|
-| **Native Apple experience** | SwiftUI + AppKit | - | Mostly web-based |
-| **Real-time push alerts** | Yes | - | Limited |
-| **Rich chart visualizations** | 4 chart types | - | Basic |
-| **Who Cites You analysis** | Yes, with export | - | Rare |
-| **Citation context (AI)** | Semantic Scholar | - | - |
-| **iCloud sync** | Yes | - | Account required |
-| **Home screen widgets** | Yes | - | - |
-| **7 languages** | Yes | N/A | English only |
-| **Privacy-first** | 100% on-device | Depends | Cloud-dependent |
-| **Free & open source** | MIT | N/A | Paid / closed |
-
----
-
-## Features
-
-### Dashboard
-At-a-glance overview of all tracked scholars — total citations, h-index, i10-index, and recent growth. One tap to refresh.
-
-### Multi-Scholar Tracking
-Add any researcher by Google Scholar profile URL or ID. Track colleagues, collaborators, or leading voices in your field — all in one place.
-
-### Advanced Charts
-Four visualization modes — **line**, **bar**, **area**, and **heatmap** — with adjustable time ranges. Spot trends, compare periods, and export charts.
-
-### Who Cites You
-Browse every paper that cites your work. Filter by year, keyword, or author. Export results to **CSV** or **JSON** for further analysis.
-
-### Citation Context (Powered by Semantic Scholar)
-See *how* other papers cite your work — with surrounding context snippets and sentiment analysis. Understand your academic influence at a deeper level.
-
-### Smart Notifications
-Get push alerts the moment your citation count changes. Never miss a milestone.
-
-### iCloud Sync
-Seamlessly sync your tracked scholars and history across iPhone, iPad, and Mac via CloudKit. Opt-in, zero-config.
-
-### Home Screen Widgets
-WidgetKit-powered widgets display citation stats right on your iOS home screen.
-
-### macOS Menu Bar
-Lightweight menu bar presence on macOS for quick citation checks without opening the full app.
-
-### 7 Languages
-English · 中文 · 日本語 · 한국어 · Español · Français · Deutsch
-
----
-
-## Example
-
-<div align="center">
-  <img src="macOS/assets/hinton_citations_example.png" alt="CiteTrack — tracking Geoffrey Hinton's citations on macOS" width="720">
-  <br>
-  <sub>Tracking Geoffrey Hinton's citation metrics with CiteTrack on macOS</sub>
-</div>
-
----
-
-## Installation
-
-### App Store (Recommended)
+### Get the app
 
 <a href="https://apps.apple.com/app/citetrack/id6752281652">
   <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" height="50">
 </a>
 
-Available for **iPhone**, **iPad**, and **Mac** — a single universal purchase.
+Available for **iPhone**, **iPad**, and **Mac** (universal purchase). Or [download the macOS .dmg](https://github.com/tao-shen/CiteTrack/releases/latest) from GitHub.
+
+---
+
+## Features
+
+- **Dashboard** — Citations, h-index, i10-index at a glance; one tap to refresh.
+- **Multi-scholar tracking** — Add any researcher by Google Scholar URL; track colleagues or collaborators in one place.
+- **Charts** — Line, bar, area, heatmap; export and compare time ranges.
+- **Who Cites You** — Browse citing papers; filter by year/keyword/author; export CSV/JSON.
+- **Citation context** — Semantic Scholar snippets show *how* others cite you.
+- **Push notifications** — Alerts when your citation count changes.
+- **iCloud sync** — Scholars and history sync across iPhone, iPad, Mac (opt-in).
+- **Widgets** — Citation stats on the iOS home screen.
+- **macOS menu bar** — Quick check without opening the app.
+- **7 languages** — English, 中文, 日本語, 한국어, Español, Français, Deutsch.
+
+---
+
+## Installation
 
 ### Direct Download (macOS)
 
@@ -160,26 +98,6 @@ CiteTrack/
 └── scripts/                      # Build & deployment automation
 ```
 
-**Design principles:**
-- **Shared-first** — 80%+ of business logic lives in `Shared/`, consumed by both platforms
-- **Native UI** — SwiftUI on iOS/iPadOS, AppKit on macOS, each optimized for its platform
-- **Local-first** — all data on-device, iCloud sync opt-in, no account required
-- **Modular services** — clean separation between data fetching, persistence, analytics, and UI
-
-### Tech Stack
-
-| Layer | Technology |
-|---|---|
-| iOS / iPadOS UI | SwiftUI, WidgetKit, UIKit (tab bar) |
-| macOS UI | AppKit, custom chart engine |
-| Networking | URLSession, Google Scholar parsing |
-| Citation Context | Semantic Scholar API |
-| Persistence | Core Data, UserDefaults (App Group) |
-| Cloud Sync | CloudKit (iCloud) |
-| Auth | Google Sign-In (iOS) |
-| Auto-Update | Sparkle (macOS direct download) |
-| Localization | 7 languages, runtime switching |
-
 ---
 
 ## Privacy & Security
@@ -190,16 +108,6 @@ CiteTrack is designed with privacy as a core principle:
 - **iCloud sync is opt-in** — your data stays on your device unless you choose otherwise
 - **No personal data collected** — the app only accesses publicly available Google Scholar pages
 - **Open source** — inspect every line of code yourself
-
----
-
-## Roadmap
-
-- [ ] Citation trend predictions with ML
-- [ ] Collaboration network visualization
-- [ ] PDF library integration
-- [ ] Apple Watch complication
-- [ ] Shortcuts & Siri integration
 
 ---
 
@@ -220,6 +128,16 @@ For bugs and feature requests, please [open an issue](https://github.com/tao-she
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Example
+
+<div align="center">
+  <img src="macOS/assets/hinton_citations_example.png" alt="CiteTrack — tracking Geoffrey Hinton's citations on macOS" width="720">
+  <br>
+  <sub>Tracking Geoffrey Hinton's citation metrics with CiteTrack on macOS</sub>
+</div>
 
 ---
 
