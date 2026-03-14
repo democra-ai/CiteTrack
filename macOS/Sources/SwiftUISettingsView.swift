@@ -219,15 +219,17 @@ struct ScholarsSettingsTab: View {
                 Button(action: { showAddSheet = true }) {
                     Image(systemName: "plus")
                         .font(.system(size: 12))
+                        .frame(width: 10)
                 }
-                .frame(width: 28, height: 22)
+                .buttonStyle(CompactToolbarButtonStyle())
                 .help(L("button_add"))
 
                 Button(action: removeSelected) {
                     Image(systemName: "minus")
                         .font(.system(size: 12))
+                        .frame(width: 10)
                 }
-                .frame(width: 28, height: 22)
+                .buttonStyle(CompactToolbarButtonStyle())
                 .disabled(selectedId == nil)
                 .help(L("button_remove"))
 
@@ -237,15 +239,17 @@ struct ScholarsSettingsTab: View {
                 Button(action: moveUp) {
                     Image(systemName: "chevron.up")
                         .font(.system(size: 11, weight: .medium))
+                        .frame(width: 10)
                 }
-                .frame(width: 28, height: 22)
+                .buttonStyle(CompactToolbarButtonStyle())
                 .disabled(selectedId == nil || isFirstSelected)
 
                 Button(action: moveDown) {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 11, weight: .medium))
+                        .frame(width: 10)
                 }
-                .frame(width: 28, height: 22)
+                .buttonStyle(CompactToolbarButtonStyle())
                 .disabled(selectedId == nil || isLastSelected)
 
                 Spacer()
@@ -262,6 +266,7 @@ struct ScholarsSettingsTab: View {
                     Label(L("button_update"), systemImage: "arrow.clockwise")
                         .font(.system(size: 11))
                 }
+                .buttonStyle(CompactToolbarButtonStyle())
                 .disabled(scholars.isEmpty || isUpdating)
             }
             .padding(.horizontal, 12)
@@ -383,6 +388,32 @@ struct ScholarsSettingsTab: View {
             scholars = PreferencesManager.shared.scholars
             NotificationCenter.default.post(name: .scholarsDataUpdated, object: nil)
         }
+    }
+}
+
+private struct CompactToolbarButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .lineLimit(1)
+            .foregroundStyle(foregroundColor(isPressed: configuration.isPressed))
+            .padding(.horizontal, 9)
+            .frame(height: 18)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(backgroundColor(isPressed: configuration.isPressed))
+            )
+            .opacity(isEnabled ? 1 : 0.72)
+    }
+
+    private func backgroundColor(isPressed: Bool) -> Color {
+        Color(nsColor: .quaternaryLabelColor).opacity(isPressed ? 0.52 : 0.44)
+    }
+
+    private func foregroundColor(isPressed: Bool) -> Color {
+        guard isEnabled else { return Color(nsColor: .secondaryLabelColor) }
+        return isPressed ? Color(nsColor: .labelColor).opacity(0.88) : Color(nsColor: .labelColor)
     }
 }
 
