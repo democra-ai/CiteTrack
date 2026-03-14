@@ -1128,8 +1128,9 @@ struct CitationChartView: View {
                     .onContinuousHover { phase in
                         switch phase {
                         case .active(let location):
-                            let x = location.x
-                            guard let date: Date = proxy.value(atX: x) else {
+                            let plotOriginX = geometry[proxy.plotAreaFrame].origin.x
+                            let x = location.x - plotOriginX
+                            guard x >= 0, let date: Date = proxy.value(atX: x) else {
                                 hoveredPoint = nil
                                 return
                             }
