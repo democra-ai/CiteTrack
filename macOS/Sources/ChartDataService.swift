@@ -654,19 +654,27 @@ enum AggregationPeriod: String, CaseIterable {
     }
     
     func keyForDate(_ date: Date, calendar: Calendar) -> String {
-        let formatter = DateFormatter()
-        
         switch self {
         case .daily:
-            formatter.dateFormat = "yyyy-MM-dd"
+            return AggregationPeriod.dailyFormatter.string(from: date)
         case .weekly:
             let weekOfYear = calendar.component(.weekOfYear, from: date)
             let year = calendar.component(.year, from: date)
             return "\(year)-W\(weekOfYear)"
         case .monthly:
-            formatter.dateFormat = "yyyy-MM"
+            return AggregationPeriod.monthlyFormatter.string(from: date)
         }
-        
-        return formatter.string(from: date)
     }
+
+    private static let dailyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static let monthlyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
 }

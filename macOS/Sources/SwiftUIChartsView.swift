@@ -89,6 +89,7 @@ struct ChartsContentView: View {
 }
 
 // MARK: - View Model
+@MainActor
 class ChartsViewModel: ObservableObject {
     @Published var scholars: [Scholar] = []
     @Published var currentScholar: Scholar?
@@ -152,14 +153,12 @@ class ChartsViewModel: ObservableObject {
         loadRequestID = requestID
 
         let completion: (Result<[CitationHistory], Error>) -> Void = { [weak self] result in
-            guard let self = self else { return }
-
-            switch result {
-            case .success(let history):
-                self.processChartData(history, for: scholar, requestID: requestID)
-            case .failure:
-                DispatchQueue.main.async {
-                    guard self.loadRequestID == requestID else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, self.loadRequestID == requestID else { return }
+                switch result {
+                case .success(let history):
+                    self.processChartData(history, for: scholar, requestID: requestID)
+                case .failure:
                     self.isLoading = false
                     self.chartData = nil
                 }
@@ -237,6 +236,7 @@ class ChartsViewModel: ObservableObject {
 
     private func downsample(_ history: [CitationHistory], to maxCount: Int) -> [CitationHistory] {
         guard history.count > maxCount else { return history }
+        guard maxCount > 1 else { return [history[0]] }
         var result: [CitationHistory] = [history[0]]
         let step = Double(history.count - 1) / Double(maxCount - 1)
         for i in 1..<(maxCount - 1) {
@@ -1085,13 +1085,21 @@ struct CitationChartView: View {
                     let startY = trendLine.slope * 0 + trendLine.intercept
                     let endY = trendLine.slope * Double(data.points.count - 1) + trendLine.intercept
 
-                    RuleMark(
-                        xStart: .value("Start", firstPoint.date),
-                        xEnd: .value("End", lastPoint.date),
-                        y: .value("Trend", (startY + endY) / 2)
+                    LineMark(
+                        x: .value("Date", firstPoint.date),
+                        y: .value("Trend", startY)
                     )
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
                     .foregroundStyle(Color.red.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                    .interpolationMethod(.linear)
+
+                    LineMark(
+                        x: .value("Date", lastPoint.date),
+                        y: .value("Trend", endY)
+                    )
+                    .foregroundStyle(Color.red.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                    .interpolationMethod(.linear)
                 }
             }
         }
@@ -1134,9 +1142,19 @@ struct CitationChartView: View {
                                 hoveredPoint = nil
                                 return
                             }
-                            hoveredPoint = data.points.min(by: {
-                                abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
-                            })
+                            // Binary search: data.points is sorted by date ascending
+                            let points = data.points
+                            var lo = 0, hi = points.count - 1
+                            while lo < hi {
+                                let mid = (lo + hi) / 2
+                                if points[mid].date < date { lo = mid + 1 } else { hi = mid }
+                            }
+                            // Check lo and its neighbour for closest match
+                            if lo > 0 && abs(points[lo - 1].date.timeIntervalSince(date)) < abs(points[lo].date.timeIntervalSince(date)) {
+                                hoveredPoint = points[lo - 1]
+                            } else {
+                                hoveredPoint = points[lo]
+                            }
                         case .ended:
                             hoveredPoint = nil
                         }
