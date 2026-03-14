@@ -221,7 +221,7 @@ struct ChartConfiguration: Codable {
     static let `default` = ChartConfiguration(
         timeRange: .lastMonth,
         chartType: .line,
-        showTrendLine: true,
+        showTrendLine: false,
         showDataPoints: true,
         showGrid: true,
         smoothLines: true,

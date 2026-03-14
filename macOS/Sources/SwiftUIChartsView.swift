@@ -180,7 +180,7 @@ class ChartsViewModel: ObservableObject {
         let config = ChartConfiguration(
             timeRange: selectedTimeRange,
             chartType: mappedChartType,
-            showTrendLine: true,
+            showTrendLine: false,
             showDataPoints: true,
             showGrid: true,
             smoothLines: true,
