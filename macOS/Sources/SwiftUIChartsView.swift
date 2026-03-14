@@ -919,6 +919,7 @@ struct DetailRow: View {
 // MARK: - Citation Chart
 struct CitationChartView: View {
     @ObservedObject var viewModel: ChartsViewModel
+    @State private var hoveredPoint: ChartDataPoint?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1049,6 +1050,36 @@ struct CitationChartView: View {
                 }
             }
 
+            if let hovered = hoveredPoint {
+                RuleMark(x: .value("Date", hovered.date))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .foregroundStyle(.secondary.opacity(0.5))
+                    .annotation(position: .top, spacing: 8) {
+                        VStack(spacing: 2) {
+                            Text("\(hovered.value)")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                            Text(hovered.label)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(.quaternary, lineWidth: 0.5)
+                        )
+                    }
+
+                PointMark(
+                    x: .value("Date", hovered.date),
+                    y: .value("Citations", hovered.value)
+                )
+                .foregroundStyle(Color(nsColor: .systemBlue))
+                .symbolSize(80)
+            }
+
             if let trendLine = data.trendLine, viewModel.chartType != .bar && viewModel.chartType != .scatter {
                 if let firstPoint = data.points.first, let lastPoint = data.points.last {
                     let startY = trendLine.slope * 0 + trendLine.intercept
@@ -1089,7 +1120,28 @@ struct CitationChartView: View {
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
                 .border(Color.primary.opacity(0.05), width: 0.5)
         }
-        .drawingGroup()
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            let x = location.x
+                            guard let date: Date = proxy.value(atX: x) else {
+                                hoveredPoint = nil
+                                return
+                            }
+                            hoveredPoint = data.points.min(by: {
+                                abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+                            })
+                        case .ended:
+                            hoveredPoint = nil
+                        }
+                    }
+            }
+        }
     }
 
     private func chartIdentity(for data: ChartData) -> String {
