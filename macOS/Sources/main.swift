@@ -78,14 +78,13 @@ class GoogleScholarService {
             return nil
         }
         
-        // 验证输入长度（Google Scholar ID通常为8-20个字符）
-        guard trimmed.count >= 8 && trimmed.count <= 100 else {
-            print("⚠️ Scholar ID 长度无效: \(trimmed.count) 字符")
-            return nil
-        }
-        
         // 检查是否包含 URL
         if trimmed.contains("scholar.google.com") || trimmed.contains("http") {
+            guard trimmed.count <= 2048 else {
+                print("⚠️ Scholar URL 长度异常: \(trimmed.count) 字符")
+                return nil
+            }
+
             // 尝试多种 URL 模式
             let patterns = [
                 #"user=([A-Za-z0-9_-]+)"#,  // 标准格式：user=ID
@@ -116,7 +115,13 @@ class GoogleScholarService {
             print("❌ 无法从URL中提取有效的Scholar ID")
             return nil
         }
-        
+
+        // 验证直接输入的 ID 长度（Google Scholar ID通常为8-20个字符）
+        guard trimmed.count >= 8 && trimmed.count <= 20 else {
+            print("⚠️ Scholar ID 长度无效: \(trimmed.count) 字符")
+            return nil
+        }
+
         // 如果是直接的ID，进行验证
         if isValidScholarId(trimmed) {
             print("✅ 直接输入的Scholar ID有效: \(trimmed)")
@@ -510,7 +515,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Firebase Analytics
         #if canImport(FirebaseCore)
-        FirebaseApp.configure()
+        if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
+            FirebaseApp.configure()
+        } else {
+            print("Firebase config skipped: GoogleService-Info.plist not found in app bundle")
+        }
         #endif
         AnalyticsService.shared.configure()
 

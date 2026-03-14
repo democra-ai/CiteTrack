@@ -102,6 +102,8 @@ class ChartsViewModel: ObservableObject {
 
     private let chartDataService = ChartDataService.shared
     private let historyManager = CitationHistoryManager.shared
+    private let chartProcessingQueue = DispatchQueue(label: "com.citetrack.swiftui.charts.processing", qos: .userInitiated)
+    private var loadRequestID = UUID()
 
     init() {
         reload()
@@ -146,16 +148,19 @@ class ChartsViewModel: ObservableObject {
         }
 
         isLoading = true
+        let requestID = UUID()
+        loadRequestID = requestID
 
         let completion: (Result<[CitationHistory], Error>) -> Void = { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.isLoading = false
+            guard let self = self else { return }
 
-                switch result {
-                case .success(let history):
-                    self.processChartData(history, for: scholar)
-                case .failure:
+            switch result {
+            case .success(let history):
+                self.processChartData(history, for: scholar, requestID: requestID)
+            case .failure:
+                DispatchQueue.main.async {
+                    guard self.loadRequestID == requestID else { return }
+                    self.isLoading = false
                     self.chartData = nil
                 }
             }
@@ -171,17 +176,75 @@ class ChartsViewModel: ObservableObject {
         }
     }
 
-    private func processChartData(_ history: [CitationHistory], for scholar: Scholar) {
+    private func processChartData(_ history: [CitationHistory], for scholar: Scholar, requestID: UUID) {
+        let selectedTimeRange = timeRange
         let config = ChartConfiguration(
-            timeRange: timeRange,
+            timeRange: selectedTimeRange,
             chartType: mappedChartType,
-            showTrendLine: chartType != .bar && chartType != .scatter,
-            showDataPoints: chartType != .area,
+            showTrendLine: true,
+            showDataPoints: true,
             showGrid: true,
-            smoothLines: chartType == .smoothLine,
+            smoothLines: true,
             colorScheme: colorScheme
         )
-        chartData = chartDataService.prepareChartData(from: history, configuration: config, scholarName: scholar.name)
+
+        chartProcessingQueue.async { [weak self] in
+            guard let self = self else { return }
+            let reducedHistory = self.reducedHistory(from: history, for: selectedTimeRange)
+            let preparedData = self.chartDataService.prepareChartData(
+                from: reducedHistory,
+                configuration: config,
+                scholarName: scholar.name
+            )
+
+            DispatchQueue.main.async {
+                guard self.loadRequestID == requestID else { return }
+                self.isLoading = false
+                self.chartData = preparedData
+            }
+        }
+    }
+
+    private func reducedHistory(from history: [CitationHistory], for timeRange: TimeRange) -> [CitationHistory] {
+        let sorted = history.sorted { $0.timestamp < $1.timestamp }
+
+        let aggregated: [CitationHistory]
+        switch timeRange {
+        case .lastWeek:
+            aggregated = sorted
+        case .lastMonth:
+            aggregated = sorted.count > 60 ? chartDataService.aggregateHistory(sorted, by: .daily) : sorted
+        case .lastQuarter:
+            aggregated = sorted.count > 90 ? chartDataService.aggregateHistory(sorted, by: .weekly) : sorted
+        case .lastYear:
+            if sorted.count > 120 {
+                aggregated = chartDataService.aggregateHistory(sorted, by: .monthly)
+            } else if sorted.count > 60 {
+                aggregated = chartDataService.aggregateHistory(sorted, by: .weekly)
+            } else {
+                aggregated = sorted
+            }
+        case .custom:
+            if sorted.count > 180 {
+                aggregated = chartDataService.aggregateHistory(sorted, by: .weekly)
+            } else {
+                aggregated = sorted
+            }
+        }
+
+        return downsample(aggregated, to: 120)
+    }
+
+    private func downsample(_ history: [CitationHistory], to maxCount: Int) -> [CitationHistory] {
+        guard history.count > maxCount else { return history }
+        var result: [CitationHistory] = [history[0]]
+        let step = Double(history.count - 1) / Double(maxCount - 1)
+        for i in 1..<(maxCount - 1) {
+            let index = Int(Double(i) * step)
+            result.append(history[index])
+        }
+        result.append(history[history.count - 1])
+        return result
     }
 
     private var mappedChartType: ChartConfiguration.ChartType {
@@ -360,7 +423,6 @@ struct ChartsToolbar: View {
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         viewModel.chartType = type
-                        viewModel.loadChartData()
                     }
                 }) {
                     Image(systemName: chartTypeIcon(type))
@@ -679,7 +741,6 @@ struct InsightSidebarView: View {
                     ForEach(ChartTheme.allCases, id: \.self) { theme in
                         Button(action: {
                             viewModel.theme = theme
-                            viewModel.loadChartData()
                         }) {
                             HStack {
                                 Text(theme.displayName)
@@ -884,6 +945,9 @@ struct CitationChartView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.horizontal, 8)
                     .padding(.bottom, 12)
+                    .transaction { transaction in
+                        transaction.animation = nil
+                    }
             } else {
                 VStack(spacing: 10) {
                     Image(systemName: "chart.line.uptrend.xyaxis")
@@ -921,8 +985,6 @@ struct CitationChartView: View {
 
     @ViewBuilder
     private func chartContent(_ data: ChartData) -> some View {
-        let themeColors = viewModel.theme.colors
-
         Chart {
             ForEach(Array(data.points.enumerated()), id: \.offset) { _, point in
                 switch viewModel.chartType {
@@ -935,16 +997,13 @@ struct CitationChartView: View {
                     .lineStyle(StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
                     .interpolationMethod(.catmullRom)
 
-                    PointMark(
-                        x: .value("Date", point.date),
-                        y: .value("Citations", point.value)
-                    )
-                    .foregroundStyle(Color(nsColor: .systemBlue))
-                    .symbolSize(40)
-                    .annotation(position: .overlay) {
-                        Circle()
-                            .strokeBorder(Color.white, lineWidth: 2)
-                            .frame(width: 8, height: 8)
+                    if data.points.count <= 60 {
+                        PointMark(
+                            x: .value("Date", point.date),
+                            y: .value("Citations", point.value)
+                        )
+                        .foregroundStyle(Color(nsColor: .systemBlue))
+                        .symbolSize(data.points.count > 30 ? 18 : 32)
                     }
 
                 case .area:
@@ -1005,6 +1064,7 @@ struct CitationChartView: View {
                 }
             }
         }
+        .id(chartIdentity(for: data))
         .chartYScale(domain: yAxisDomain(for: data))
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 6)) { _ in
@@ -1029,5 +1089,11 @@ struct CitationChartView: View {
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
                 .border(Color.primary.opacity(0.05), width: 0.5)
         }
+        .drawingGroup()
+    }
+
+    private func chartIdentity(for data: ChartData) -> String {
+        let scholarID = viewModel.currentScholar?.id ?? "none"
+        return "\(scholarID)-\(viewModel.timeRange.rawValue)-\(viewModel.chartType.rawValue)-\(data.points.count)"
     }
 }

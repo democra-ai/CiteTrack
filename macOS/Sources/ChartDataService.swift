@@ -244,18 +244,12 @@ class ChartDataService {
         configuration: ChartConfiguration,
         scholarName: String = ""
     ) -> ChartData {
-        print("ChartDataService: Preparing chart data from \(history.count) history entries")
-        
         guard !history.isEmpty else {
-            print("ChartDataService: No history data, creating empty chart")
             return createEmptyChartData(title: scholarName)
         }
-        
+
         let sortedHistory = history.sorted { $0.timestamp < $1.timestamp }
-        print("ChartDataService: Sorted history has \(sortedHistory.count) entries")
-        
         let points = createDataPoints(from: sortedHistory)
-        print("ChartDataService: Created \(points.count) data points")
         
         let xAxisLabels = generateXAxisLabels(for: sortedHistory, timeRange: configuration.timeRange)
         let yAxisRange = calculateYAxisRange(from: sortedHistory)
@@ -281,8 +275,6 @@ class ChartDataService {
             statistics: statistics,
             insights: insights
         )
-        
-        print("ChartDataService: Final chart data - points: \(chartData.points.count), isEmpty: \(chartData.isEmpty)")
         
         return chartData
     }
@@ -310,14 +302,13 @@ class ChartDataService {
     
     private func createDataPoints(from history: [CitationHistory]) -> [ChartDataPoint] {
         let sortedHistory = history.sorted { $0.timestamp < $1.timestamp }
-        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .none
+
         return sortedHistory.enumerated().map { index, entry in
             let x = Double(index)
             let y = Double(entry.citationCount)
-            
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateStyle = .medium
-            dateFormatter.timeStyle = .none
             let label = dateFormatter.string(from: entry.timestamp)
             
             let metadata: [String: Any] = [

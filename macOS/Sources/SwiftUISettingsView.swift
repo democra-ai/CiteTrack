@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - SwiftUI Settings View
 struct SettingsView: View {
@@ -505,6 +506,7 @@ struct AddScholarSheet: View {
     @Binding var error: String?
     var onAdd: () -> Void
     var onCancel: () -> Void
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -528,10 +530,21 @@ struct AddScholarSheet: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                TextField(L("scholar_id_placeholder"), text: $input)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 13, design: .monospaced))
-                    .onSubmit { onAdd() }
+                HStack(spacing: 8) {
+                    TextField(L("scholar_id_placeholder"), text: $input)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 13, design: .monospaced))
+                        .focused($isInputFocused)
+                        .onSubmit { onAdd() }
+
+                    Button("Paste") {
+                        if let pasted = NSPasteboard.general.string(forType: .string) {
+                            input = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
+                            error = nil
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
 
                 Text("e.g. MeaDj20AAAAJ or https://scholar.google.com/citations?user=MeaDj20AAAAJ")
                     .font(.system(size: 10))
@@ -559,6 +572,11 @@ struct AddScholarSheet: View {
         }
         .padding(24)
         .frame(width: 480)
+        .onAppear {
+            DispatchQueue.main.async {
+                isInputFocused = true
+            }
+        }
     }
 }
 
