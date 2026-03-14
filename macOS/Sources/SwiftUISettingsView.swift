@@ -220,12 +220,14 @@ struct ScholarsSettingsTab: View {
                     Image(systemName: "plus")
                         .font(.system(size: 12))
                 }
+                .frame(width: 28, height: 22)
                 .help(L("button_add"))
 
                 Button(action: removeSelected) {
                     Image(systemName: "minus")
                         .font(.system(size: 12))
                 }
+                .frame(width: 28, height: 22)
                 .disabled(selectedId == nil)
                 .help(L("button_remove"))
 
@@ -236,12 +238,14 @@ struct ScholarsSettingsTab: View {
                     Image(systemName: "chevron.up")
                         .font(.system(size: 11, weight: .medium))
                 }
+                .frame(width: 28, height: 22)
                 .disabled(selectedId == nil || isFirstSelected)
 
                 Button(action: moveDown) {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 11, weight: .medium))
                 }
+                .frame(width: 28, height: 22)
                 .disabled(selectedId == nil || isLastSelected)
 
                 Spacer()
