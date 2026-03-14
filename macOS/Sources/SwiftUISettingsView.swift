@@ -395,25 +395,52 @@ private struct CompactToolbarButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .lineLimit(1)
-            .foregroundStyle(foregroundColor(isPressed: configuration.isPressed))
-            .padding(.horizontal, 9)
-            .frame(height: 18)
-            .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(backgroundColor(isPressed: configuration.isPressed))
-            )
-            .opacity(isEnabled ? 1 : 0.72)
+        HoverAwareButtonBody(
+            label: configuration.label,
+            isEnabled: isEnabled,
+            isPressed: configuration.isPressed
+        )
     }
 
-    private func backgroundColor(isPressed: Bool) -> Color {
-        Color(nsColor: .quaternaryLabelColor).opacity(isPressed ? 0.52 : 0.44)
-    }
+    private struct HoverAwareButtonBody<Label: View>: View {
+        let label: Label
+        let isEnabled: Bool
+        let isPressed: Bool
+        @State private var isHovered = false
 
-    private func foregroundColor(isPressed: Bool) -> Color {
-        guard isEnabled else { return Color(nsColor: .secondaryLabelColor) }
-        return isPressed ? Color(nsColor: .labelColor).opacity(0.88) : Color(nsColor: .labelColor)
+        var body: some View {
+            label
+                .lineLimit(1)
+                .foregroundStyle(foregroundColor)
+                .padding(.horizontal, 9)
+                .frame(height: 18)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(backgroundColor)
+                )
+                .opacity(isEnabled ? 1 : 0.72)
+                .onHover { hovering in
+                    isHovered = hovering
+                }
+        }
+
+        private var backgroundColor: Color {
+            if isPressed {
+                return Color(nsColor: .tertiaryLabelColor).opacity(0.7)
+            }
+            if isEnabled && isHovered {
+                return Color(nsColor: .tertiaryLabelColor).opacity(0.58)
+            }
+            return Color(nsColor: .tertiaryLabelColor).opacity(0.26)
+        }
+
+        private var foregroundColor: Color {
+            guard isEnabled else { return Color(nsColor: .secondaryLabelColor) }
+            if isPressed || isHovered {
+                return Color(nsColor: .labelColor)
+            }
+            return Color(nsColor: .labelColor).opacity(0.98)
+        }
     }
 }
 
