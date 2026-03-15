@@ -1,5 +1,6 @@
 .kiro/
 .claude/
+.omc/
 
 # macOS
 .DS_Store
@@ -31,6 +32,7 @@ Temporary Items
 # Xcode
 *.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
+**/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcshareddata/
 *.xcworkspace/xcuserdata/
 *.xcworkspace/xcshareddata/

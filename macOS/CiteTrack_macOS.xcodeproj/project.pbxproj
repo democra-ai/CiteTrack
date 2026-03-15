@@ -38,7 +38,6 @@
 		E5382A5D6E344E2EB79B0A0C /* CitationCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 002A29E87D14470BACF2D64C /* CitationCacheService.swift */; };
 		9E5F82A5E13D4A7491A976B9 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 935D94836ED349F7B0E9C40D /* Constants.swift */; };
 		FIREBASE0D2E7600MACBUILD1 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = FIREBASE0E2E7600MACPROD1 /* FirebaseAnalytics */; };
-		GSPLIST0C2E7600MACBUILD1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = GSPLIST0D2E7600MACFILEREF /* GoogleService-Info.plist */; };
 		B1C2D3E4F5A6B1C2D3E4F5A6 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E1F2A3B4C5D6 /* AnalyticsService.swift */; };
 		B2C3D4E5F6A7B2C3D4E5F6A7 /* AnalyticsEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F3A4B5C6D7E2F3A4B5C6D7 /* AnalyticsEvents.swift */; };
 		SWUI0001A0B1C2D3E4F5A6B7 /* SwiftUISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SWUI0002A0B1C2D3E4F5A6B7 /* SwiftUISettingsView.swift */; };
@@ -249,7 +248,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				AC11BD407130C9A1D5FE0373 /* app_icon.icns in Resources */,
-				GSPLIST0C2E7600MACBUILD1 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

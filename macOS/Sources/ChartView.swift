@@ -45,6 +45,16 @@ class ChartView: NSView {
         )
     }
 
+    private func xPosition(for index: Int, totalPoints: Int, in rect: NSRect) -> CGFloat {
+        guard totalPoints > 1 else {
+            return rect.minX + rect.width / 2
+        }
+
+        let clampedIndex = min(max(index, 0), totalPoints - 1)
+        let step = rect.width / CGFloat(totalPoints - 1)
+        return rect.minX + step * CGFloat(clampedIndex)
+    }
+
     // MARK: - Initialization
 
     override init(frame frameRect: NSRect) {
@@ -262,7 +272,7 @@ class ChartView: NSView {
             let step = max(1, xLabels.count / maxLabels)
 
             for i in stride(from: 0, to: xLabels.count, by: step) {
-                let x = rect.minX + (rect.width / CGFloat(data.points.count - 1)) * CGFloat(i)
+                let x = xPosition(for: i, totalPoints: data.points.count, in: rect)
                 let label = xLabels[i]
 
                 let attributes: [NSAttributedString.Key: Any] = [
@@ -353,7 +363,7 @@ class ChartView: NSView {
         let path = CGMutablePath()
 
         for (index, point) in points.enumerated() {
-            let x = rect.minX + (rect.width / CGFloat(points.count - 1)) * CGFloat(index)
+            let x = xPosition(for: index, totalPoints: points.count, in: rect)
             let y = rect.minY + (rect.height * CGFloat((point.y - yRange.min) / (yRange.max - yRange.min)))
 
             if index == 0 {
@@ -361,7 +371,7 @@ class ChartView: NSView {
             } else {
                 if configuration.smoothLines {
                     let previousIndex = index - 1
-                    let prevX = rect.minX + (rect.width / CGFloat(points.count - 1)) * CGFloat(previousIndex)
+                    let prevX = xPosition(for: previousIndex, totalPoints: points.count, in: rect)
                     let prevY = rect.minY + (rect.height * CGFloat((points[previousIndex].y - yRange.min) / (yRange.max - yRange.min)))
 
                     let controlPoint1 = CGPoint(x: prevX + (x - prevX) * 0.5, y: prevY)
@@ -452,7 +462,7 @@ class ChartView: NSView {
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
 
         for (index, point) in points.enumerated() {
-            let x = rect.minX + (rect.width / CGFloat(points.count - 1)) * CGFloat(index)
+            let x = xPosition(for: index, totalPoints: points.count, in: rect)
             let y = rect.minY + (rect.height * CGFloat((point.y - yRange.min) / (yRange.max - yRange.min)))
             path.addLine(to: CGPoint(x: x, y: y))
         }
@@ -502,7 +512,7 @@ class ChartView: NSView {
         let points = data.points
 
         for (index, point) in points.enumerated() {
-            let x = rect.minX + (rect.width / CGFloat(points.count - 1)) * CGFloat(index)
+            let x = xPosition(for: index, totalPoints: points.count, in: rect)
             let y = rect.minY + (rect.height * CGFloat((point.y - yRange.min) / (yRange.max - yRange.min)))
 
             // White stroke ring
@@ -523,7 +533,7 @@ class ChartView: NSView {
 
         guard let index = data.points.firstIndex(where: { $0.date == point.date }) else { return }
 
-        let x = rect.minX + (rect.width / CGFloat(data.points.count - 1)) * CGFloat(index)
+        let x = xPosition(for: index, totalPoints: data.points.count, in: rect)
         let y = rect.minY + (rect.height * CGFloat((point.y - yRange.min) / (yRange.max - yRange.min)))
 
         // Vertical crosshair — very subtle
@@ -653,12 +663,7 @@ class ChartView: NSView {
         for (index, point) in points.enumerated() {
             guard point.y.isFinite else { continue }
 
-            let x: CGFloat
-            if points.count == 1 {
-                x = rect.minX + rect.width / 2
-            } else {
-                x = rect.minX + (rect.width / CGFloat(points.count - 1)) * CGFloat(index)
-            }
+            let x = xPosition(for: index, totalPoints: points.count, in: rect)
 
             let normalizedY = (point.y - yRange.min) / (yRange.max - yRange.min)
             let clampedY = max(0, min(1, normalizedY))

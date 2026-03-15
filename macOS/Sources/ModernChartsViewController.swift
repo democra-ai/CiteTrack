@@ -503,12 +503,7 @@ class ModernChartsViewController: NSViewController {
     }
 
     private func shouldShowTrendLine(for chartType: ChartType) -> Bool {
-        switch chartType {
-        case .bar, .scatter:
-            return false
-        default:
-            return true
-        }
+        return false
     }
 
     private func shouldShowDataPoints(for chartType: ChartType) -> Bool {

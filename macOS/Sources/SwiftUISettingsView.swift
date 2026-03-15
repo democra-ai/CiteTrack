@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - SwiftUI Settings View
 struct SettingsView: View {
@@ -218,13 +219,17 @@ struct ScholarsSettingsTab: View {
                 Button(action: { showAddSheet = true }) {
                     Image(systemName: "plus")
                         .font(.system(size: 12))
+                        .frame(width: 10)
                 }
+                .buttonStyle(CompactToolbarButtonStyle())
                 .help(L("button_add"))
 
                 Button(action: removeSelected) {
                     Image(systemName: "minus")
                         .font(.system(size: 12))
+                        .frame(width: 10)
                 }
+                .buttonStyle(CompactToolbarButtonStyle())
                 .disabled(selectedId == nil)
                 .help(L("button_remove"))
 
@@ -234,13 +239,17 @@ struct ScholarsSettingsTab: View {
                 Button(action: moveUp) {
                     Image(systemName: "chevron.up")
                         .font(.system(size: 11, weight: .medium))
+                        .frame(width: 10)
                 }
+                .buttonStyle(CompactToolbarButtonStyle())
                 .disabled(selectedId == nil || isFirstSelected)
 
                 Button(action: moveDown) {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 11, weight: .medium))
+                        .frame(width: 10)
                 }
+                .buttonStyle(CompactToolbarButtonStyle())
                 .disabled(selectedId == nil || isLastSelected)
 
                 Spacer()
@@ -257,6 +266,7 @@ struct ScholarsSettingsTab: View {
                     Label(L("button_update"), systemImage: "arrow.clockwise")
                         .font(.system(size: 11))
                 }
+                .buttonStyle(CompactToolbarButtonStyle())
                 .disabled(scholars.isEmpty || isUpdating)
             }
             .padding(.horizontal, 12)
@@ -377,6 +387,59 @@ struct ScholarsSettingsTab: View {
             isUpdating = false
             scholars = PreferencesManager.shared.scholars
             NotificationCenter.default.post(name: .scholarsDataUpdated, object: nil)
+        }
+    }
+}
+
+private struct CompactToolbarButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        HoverAwareButtonBody(
+            label: configuration.label,
+            isEnabled: isEnabled,
+            isPressed: configuration.isPressed
+        )
+    }
+
+    private struct HoverAwareButtonBody<Label: View>: View {
+        let label: Label
+        let isEnabled: Bool
+        let isPressed: Bool
+        @State private var isHovered = false
+
+        var body: some View {
+            label
+                .lineLimit(1)
+                .foregroundStyle(foregroundColor)
+                .padding(.horizontal, 9)
+                .frame(height: 18)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(backgroundColor)
+                )
+                .opacity(isEnabled ? 1 : 0.72)
+                .onHover { hovering in
+                    isHovered = hovering
+                }
+        }
+
+        private var backgroundColor: Color {
+            if isPressed {
+                return Color(nsColor: .tertiaryLabelColor).opacity(0.7)
+            }
+            if isEnabled && isHovered {
+                return Color(nsColor: .tertiaryLabelColor).opacity(0.58)
+            }
+            return Color(nsColor: .tertiaryLabelColor).opacity(0.26)
+        }
+
+        private var foregroundColor: Color {
+            guard isEnabled else { return Color(nsColor: .secondaryLabelColor) }
+            if isPressed || isHovered {
+                return Color(nsColor: .labelColor)
+            }
+            return Color(nsColor: .labelColor).opacity(0.98)
         }
     }
 }
@@ -505,6 +568,7 @@ struct AddScholarSheet: View {
     @Binding var error: String?
     var onAdd: () -> Void
     var onCancel: () -> Void
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -528,10 +592,21 @@ struct AddScholarSheet: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                TextField(L("scholar_id_placeholder"), text: $input)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 13, design: .monospaced))
-                    .onSubmit { onAdd() }
+                HStack(spacing: 8) {
+                    TextField(L("scholar_id_placeholder"), text: $input)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 13, design: .monospaced))
+                        .focused($isInputFocused)
+                        .onSubmit { onAdd() }
+
+                    Button("Paste") {
+                        if let pasted = NSPasteboard.general.string(forType: .string) {
+                            input = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
+                            error = nil
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
 
                 Text("e.g. MeaDj20AAAAJ or https://scholar.google.com/citations?user=MeaDj20AAAAJ")
                     .font(.system(size: 10))
@@ -559,6 +634,11 @@ struct AddScholarSheet: View {
         }
         .padding(24)
         .frame(width: 480)
+        .onAppear {
+            DispatchQueue.main.async {
+                isInputFocused = true
+            }
+        }
     }
 }
 

@@ -89,6 +89,7 @@ struct ChartsContentView: View {
 }
 
 // MARK: - View Model
+@MainActor
 class ChartsViewModel: ObservableObject {
     @Published var scholars: [Scholar] = []
     @Published var currentScholar: Scholar?
@@ -102,6 +103,8 @@ class ChartsViewModel: ObservableObject {
 
     private let chartDataService = ChartDataService.shared
     private let historyManager = CitationHistoryManager.shared
+    private let chartProcessingQueue = DispatchQueue(label: "com.citetrack.swiftui.charts.processing", qos: .userInitiated)
+    private var loadRequestID = UUID()
 
     init() {
         reload()
@@ -146,16 +149,17 @@ class ChartsViewModel: ObservableObject {
         }
 
         isLoading = true
+        let requestID = UUID()
+        loadRequestID = requestID
 
         let completion: (Result<[CitationHistory], Error>) -> Void = { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.isLoading = false
-
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, self.loadRequestID == requestID else { return }
                 switch result {
                 case .success(let history):
-                    self.processChartData(history, for: scholar)
+                    self.processChartData(history, for: scholar, requestID: requestID)
                 case .failure:
+                    self.isLoading = false
                     self.chartData = nil
                 }
             }
@@ -171,17 +175,76 @@ class ChartsViewModel: ObservableObject {
         }
     }
 
-    private func processChartData(_ history: [CitationHistory], for scholar: Scholar) {
+    private func processChartData(_ history: [CitationHistory], for scholar: Scholar, requestID: UUID) {
+        let selectedTimeRange = timeRange
         let config = ChartConfiguration(
-            timeRange: timeRange,
+            timeRange: selectedTimeRange,
             chartType: mappedChartType,
-            showTrendLine: chartType != .bar && chartType != .scatter,
-            showDataPoints: chartType != .area,
+            showTrendLine: false,
+            showDataPoints: true,
             showGrid: true,
-            smoothLines: chartType == .smoothLine,
+            smoothLines: true,
             colorScheme: colorScheme
         )
-        chartData = chartDataService.prepareChartData(from: history, configuration: config, scholarName: scholar.name)
+
+        chartProcessingQueue.async { [weak self] in
+            guard let self = self else { return }
+            let reducedHistory = self.reducedHistory(from: history, for: selectedTimeRange)
+            let preparedData = self.chartDataService.prepareChartData(
+                from: reducedHistory,
+                configuration: config,
+                scholarName: scholar.name
+            )
+
+            DispatchQueue.main.async {
+                guard self.loadRequestID == requestID else { return }
+                self.isLoading = false
+                self.chartData = preparedData
+            }
+        }
+    }
+
+    private func reducedHistory(from history: [CitationHistory], for timeRange: TimeRange) -> [CitationHistory] {
+        let sorted = history.sorted { $0.timestamp < $1.timestamp }
+
+        let aggregated: [CitationHistory]
+        switch timeRange {
+        case .lastWeek:
+            aggregated = sorted
+        case .lastMonth:
+            aggregated = sorted.count > 60 ? chartDataService.aggregateHistory(sorted, by: .daily) : sorted
+        case .lastQuarter:
+            aggregated = sorted.count > 90 ? chartDataService.aggregateHistory(sorted, by: .weekly) : sorted
+        case .lastYear:
+            if sorted.count > 120 {
+                aggregated = chartDataService.aggregateHistory(sorted, by: .monthly)
+            } else if sorted.count > 60 {
+                aggregated = chartDataService.aggregateHistory(sorted, by: .weekly)
+            } else {
+                aggregated = sorted
+            }
+        case .custom:
+            if sorted.count > 180 {
+                aggregated = chartDataService.aggregateHistory(sorted, by: .weekly)
+            } else {
+                aggregated = sorted
+            }
+        }
+
+        return downsample(aggregated, to: 120)
+    }
+
+    private func downsample(_ history: [CitationHistory], to maxCount: Int) -> [CitationHistory] {
+        guard history.count > maxCount else { return history }
+        guard maxCount > 1 else { return [history[0]] }
+        var result: [CitationHistory] = [history[0]]
+        let step = Double(history.count - 1) / Double(maxCount - 1)
+        for i in 1..<(maxCount - 1) {
+            let index = Int(Double(i) * step)
+            result.append(history[index])
+        }
+        result.append(history[history.count - 1])
+        return result
     }
 
     private var mappedChartType: ChartConfiguration.ChartType {
@@ -360,7 +423,6 @@ struct ChartsToolbar: View {
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         viewModel.chartType = type
-                        viewModel.loadChartData()
                     }
                 }) {
                     Image(systemName: chartTypeIcon(type))
@@ -679,7 +741,6 @@ struct InsightSidebarView: View {
                     ForEach(ChartTheme.allCases, id: \.self) { theme in
                         Button(action: {
                             viewModel.theme = theme
-                            viewModel.loadChartData()
                         }) {
                             HStack {
                                 Text(theme.displayName)
@@ -858,6 +919,7 @@ struct DetailRow: View {
 // MARK: - Citation Chart
 struct CitationChartView: View {
     @ObservedObject var viewModel: ChartsViewModel
+    @State private var hoveredPoint: ChartDataPoint?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -884,6 +946,9 @@ struct CitationChartView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.horizontal, 8)
                     .padding(.bottom, 12)
+                    .transaction { transaction in
+                        transaction.animation = nil
+                    }
             } else {
                 VStack(spacing: 10) {
                     Image(systemName: "chart.line.uptrend.xyaxis")
@@ -921,8 +986,6 @@ struct CitationChartView: View {
 
     @ViewBuilder
     private func chartContent(_ data: ChartData) -> some View {
-        let themeColors = viewModel.theme.colors
-
         Chart {
             ForEach(Array(data.points.enumerated()), id: \.offset) { _, point in
                 switch viewModel.chartType {
@@ -935,16 +998,13 @@ struct CitationChartView: View {
                     .lineStyle(StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
                     .interpolationMethod(.catmullRom)
 
-                    PointMark(
-                        x: .value("Date", point.date),
-                        y: .value("Citations", point.value)
-                    )
-                    .foregroundStyle(Color(nsColor: .systemBlue))
-                    .symbolSize(40)
-                    .annotation(position: .overlay) {
-                        Circle()
-                            .strokeBorder(Color.white, lineWidth: 2)
-                            .frame(width: 8, height: 8)
+                    if data.points.count <= 60 {
+                        PointMark(
+                            x: .value("Date", point.date),
+                            y: .value("Citations", point.value)
+                        )
+                        .foregroundStyle(Color(nsColor: .systemBlue))
+                        .symbolSize(data.points.count > 30 ? 18 : 32)
                     }
 
                 case .area:
@@ -990,21 +1050,60 @@ struct CitationChartView: View {
                 }
             }
 
+            if let hovered = hoveredPoint {
+                RuleMark(x: .value("Date", hovered.date))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .foregroundStyle(.secondary.opacity(0.5))
+                    .annotation(position: .top, spacing: 8) {
+                        VStack(spacing: 2) {
+                            Text("\(hovered.value)")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                            Text(hovered.label)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(.quaternary, lineWidth: 0.5)
+                        )
+                    }
+
+                PointMark(
+                    x: .value("Date", hovered.date),
+                    y: .value("Citations", hovered.value)
+                )
+                .foregroundStyle(Color(nsColor: .systemBlue))
+                .symbolSize(80)
+            }
+
             if let trendLine = data.trendLine, viewModel.chartType != .bar && viewModel.chartType != .scatter {
                 if let firstPoint = data.points.first, let lastPoint = data.points.last {
                     let startY = trendLine.slope * 0 + trendLine.intercept
                     let endY = trendLine.slope * Double(data.points.count - 1) + trendLine.intercept
 
-                    RuleMark(
-                        xStart: .value("Start", firstPoint.date),
-                        xEnd: .value("End", lastPoint.date),
-                        y: .value("Trend", (startY + endY) / 2)
+                    LineMark(
+                        x: .value("Date", firstPoint.date),
+                        y: .value("Trend", startY)
                     )
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
                     .foregroundStyle(Color.red.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                    .interpolationMethod(.linear)
+
+                    LineMark(
+                        x: .value("Date", lastPoint.date),
+                        y: .value("Trend", endY)
+                    )
+                    .foregroundStyle(Color.red.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                    .interpolationMethod(.linear)
                 }
             }
         }
+        .id(chartIdentity(for: data))
         .chartYScale(domain: yAxisDomain(for: data))
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 6)) { _ in
@@ -1029,5 +1128,43 @@ struct CitationChartView: View {
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
                 .border(Color.primary.opacity(0.05), width: 0.5)
         }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            let plotOriginX = geometry[proxy.plotAreaFrame].origin.x
+                            let x = location.x - plotOriginX
+                            guard x >= 0, let date: Date = proxy.value(atX: x) else {
+                                hoveredPoint = nil
+                                return
+                            }
+                            // Binary search: data.points is sorted by date ascending
+                            let points = data.points
+                            var lo = 0, hi = points.count - 1
+                            while lo < hi {
+                                let mid = (lo + hi) / 2
+                                if points[mid].date < date { lo = mid + 1 } else { hi = mid }
+                            }
+                            // Check lo and its neighbour for closest match
+                            if lo > 0 && abs(points[lo - 1].date.timeIntervalSince(date)) < abs(points[lo].date.timeIntervalSince(date)) {
+                                hoveredPoint = points[lo - 1]
+                            } else {
+                                hoveredPoint = points[lo]
+                            }
+                        case .ended:
+                            hoveredPoint = nil
+                        }
+                    }
+            }
+        }
+    }
+
+    private func chartIdentity(for data: ChartData) -> String {
+        let scholarID = viewModel.currentScholar?.id ?? "none"
+        return "\(scholarID)-\(viewModel.timeRange.rawValue)-\(viewModel.chartType.rawValue)-\(data.points.count)"
     }
 }
