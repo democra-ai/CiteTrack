@@ -73,28 +73,42 @@ public class ScholarDataService: ObservableObject {
     // MARK: - 主要方法
     
     /// 获取学者信息并更新数据
-    public func fetchAndUpdateScholar(id: String) async throws -> Scholar {
-        print("🔍 [ScholarDataService] Fetching scholar: \(id)")
-        
+    /// - Parameters:
+    ///   - id: 学者 Google Scholar ID
+    ///   - forceRefresh: 为 true 时忽略最小刷新间隔，强制从网络获取
+    public func fetchAndUpdateScholar(id: String, forceRefresh: Bool = false) async throws -> Scholar {
+        print("🔍 [ScholarDataService] Fetching scholar: \(id), forceRefresh: \(forceRefresh)")
+
         // 1. 先检查统一缓存
         if let basicInfo = await UnifiedCacheManager.shared.getScholarBasicInfo(scholarId: id) {
+            // 检查数据是否足够新鲜（1小时内），如果是且非强制刷新，直接返回缓存
+            let isFresh = await UnifiedCacheManager.shared.isDataFresh(scholarId: id)
+            if isFresh && !forceRefresh {
+                print("⏳ [ScholarDataService] Data still fresh (within 1h), skipping network request: \(basicInfo.name)")
+                var scholar = Scholar(id: id, name: basicInfo.name)
+                scholar.citations = basicInfo.citations
+                scholar.lastUpdated = basicInfo.lastUpdated
+                await dataManager.updateScholar(scholar)
+                return scholar
+            }
+
             print("💾 [ScholarDataService] Using unified cache: \(basicInfo.name), \(basicInfo.citations) citations")
-            
+
             // 使用缓存数据，跳过网络请求
             var scholar = Scholar(id: id, name: basicInfo.name)
             scholar.citations = basicInfo.citations
             scholar.lastUpdated = basicInfo.lastUpdated
-            
+
             await dataManager.updateScholar(scholar)
-            
+
             // 添加引用历史记录
             let history = CitationHistory(scholarId: id, citationCount: basicInfo.citations)
             await dataManager.addCitationHistory(history)
-            
+
             print("✅ [ScholarDataService] Updated from cache: \(basicInfo.name) - \(basicInfo.citations)引用")
             return scholar
         }
-        
+
         print("🌐 [ScholarDataService] Cache miss, fetching from network")
         
         // 2. 缓存未命中，从网络获取

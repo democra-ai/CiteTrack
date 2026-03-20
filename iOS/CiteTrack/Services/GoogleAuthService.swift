@@ -20,8 +20,19 @@ public class GoogleAuthService: ObservableObject {
     private init() {
         restorePersistedUser()
         #if canImport(GoogleSignIn)
-        restorePreviousSession()
+        if Self.hasGIDClientID {
+            restorePreviousSession()
+        }
         #endif
+    }
+
+    /// Check whether GIDClientID is configured in Info.plist before touching the SDK
+    private static var hasGIDClientID: Bool {
+        guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String,
+              !clientID.isEmpty else {
+            return false
+        }
+        return true
     }
 
     // MARK: - Sign In
@@ -30,6 +41,19 @@ public class GoogleAuthService: ObservableObject {
         errorMessage = nil
 
         #if canImport(GoogleSignIn)
+        guard Self.hasGIDClientID else {
+            // Fall through to mock path when GIDClientID is not configured
+            let mock = GoogleUser(
+                id: "dev_mock_user",
+                email: "researcher@university.edu",
+                displayName: "Demo Researcher",
+                photoURL: nil
+            )
+            currentUser = mock
+            isSignedIn = true
+            persist(mock)
+            return
+        }
         isLoading = true
         GIDSignIn.sharedInstance.signIn(withPresenting: viewController) { [weak self] result, error in
             DispatchQueue.main.async {

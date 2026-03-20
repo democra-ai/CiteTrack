@@ -163,9 +163,18 @@ public class AutoUpdateManager: ObservableObject {
         let totalCount = scholars.count
         
         for scholar in scholars {
-            // 使用统一协调器获取学者数据（中等优先级，后台自动更新）
-            await CitationFetchCoordinator.shared.fetchScholarComprehensive(
+            // 自动更新只获取学者主页第一页（1次请求 = 基本信息 + 第一页论文）
+            // 避免 fetchScholarComprehensive 的 ~10 次请求，大幅降低被封禁风险
+            // 先检查数据是否足够新鲜（1小时内），如果是则跳过
+            if UnifiedCacheManager.shared.isDataFresh(scholarId: scholar.id) {
+                print("⏳ [AutoUpdateManager] 学者数据仍然新鲜，跳过: \(scholar.name)")
+                successCount = min(successCount + 1, Int.max - 1)
+                continue
+            }
+            await CitationFetchCoordinator.shared.fetchScholarProfilePage(
                 scholarId: scholar.id,
+                sortBy: "total",
+                startIndex: 0,
                 priority: .medium
             )
             

@@ -82,8 +82,8 @@ public class UnifiedCacheManager: ObservableObject {
     /// 原始数据快照存储（按时间顺序，用于审计和回溯）
     private var dataSnapshots: [String: [ScholarDataSnapshot]] = [:]  // scholarId -> snapshots
     
-    /// 缓存过期时间（24小时）
-    private let cacheExpirationInterval: TimeInterval = 24 * 60 * 60
+    /// 缓存过期时间（7天 — 学术引用数据变化缓慢，延长缓存可大幅减少 Google Scholar 请求）
+    private let cacheExpirationInterval: TimeInterval = 7 * 24 * 60 * 60
     
     /// 持久化存储键
     private let persistenceKey = "UnifiedCacheManager_Data"
@@ -340,19 +340,31 @@ public class UnifiedCacheManager: ObservableObject {
     
     // MARK: - 数据获取方法
     
+    /// 最小刷新间隔（1小时内不重复请求同一学者）
+    private let minimumRefreshInterval: TimeInterval = 60 * 60
+
     /// 获取学者基本信息
     public func getScholarBasicInfo(scholarId: String) -> ScholarBasicInfo? {
         guard let info = scholarBasicInfo[scholarId] else {
             return nil
         }
-        
+
         // 检查缓存是否过期
         if Date().timeIntervalSince(info.lastUpdated) > cacheExpirationInterval {
             print("⚠️ [UnifiedCache] Basic info expired for \(scholarId)")
             return nil
         }
-        
+
         return info
+    }
+
+    /// 检查学者数据是否足够新鲜（在最小刷新间隔内），不需要重新获取
+    /// - Returns: true 表示数据仍然新鲜，不需要网络请求
+    public func isDataFresh(scholarId: String) -> Bool {
+        guard let info = scholarBasicInfo[scholarId] else {
+            return false
+        }
+        return Date().timeIntervalSince(info.lastUpdated) < minimumRefreshInterval
     }
     
     /// 获取论文列表
@@ -427,6 +439,10 @@ public class UnifiedCacheManager: ObservableObject {
                     result.append(newPub)
                     updatedCount += 1
                     print("🔄 [UnifiedCache] Citation count updated: '\(newPub.title.prefix(50))...' \(oldCitationCount) → \(newCitationCount)")
+                } else if existingPub.authors.isEmpty && !newPub.authors.isEmpty {
+                    // 引用数未变化，但旧数据缺少作者信息 → 用新数据补全
+                    result.append(newPub)
+                    updatedCount += 1
                 } else {
                     // 引用数未变化，保留原有论文（避免不必要的更新）
                     result.append(existingPub)

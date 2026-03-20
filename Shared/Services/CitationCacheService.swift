@@ -6,8 +6,8 @@ import Foundation
 public class CitationCacheService {
     public static let shared = CitationCacheService()
     
-    // 缓存过期时间（24小时）
-    private let cacheExpirationInterval: TimeInterval = 24 * 60 * 60
+    // 缓存过期时间（7天 — 与 UnifiedCacheManager 一致，减少 Google Scholar 请求）
+    private let cacheExpirationInterval: TimeInterval = 7 * 24 * 60 * 60
     
     // 内存缓存
     private var paperCache: [String: (papers: [CitingPaper], timestamp: Date)] = [:]

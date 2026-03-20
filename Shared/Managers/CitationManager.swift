@@ -87,7 +87,7 @@ public class CitationManager: ObservableObject {
     }
     
     /// 异步获取学者的论文列表
-    private func fetchScholarPublicationsAsync(for scholarId: String, sortBy: String? = nil, forceRefresh: Bool = false) async {
+    public func fetchScholarPublicationsAsync(for scholarId: String, sortBy: String? = nil, forceRefresh: Bool = false) async {
         logInfo("Fetching scholar publications for: \(scholarId), sortBy: \(sortBy ?? "default"), forceRefresh: \(forceRefresh)")
         
         await MainActor.run {

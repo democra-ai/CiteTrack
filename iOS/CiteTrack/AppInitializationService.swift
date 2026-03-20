@@ -176,7 +176,17 @@ class AppInitializationService: ObservableObject {
             await MainActor.run {
                 initializationProgress = String(format: "debug_init_update_scholar".localized, scholar.name)
             }
-            
+
+            // 如果数据仍然新鲜（1小时内），跳过网络请求
+            let isFresh = await MainActor.run {
+                UnifiedCacheManager.shared.isDataFresh(scholarId: scholar.id)
+            }
+            if isFresh {
+                print("⏳ [AppInitialization] Data still fresh, skipping: \(scholar.name)")
+                successCount = min(successCount + 1, Int.max - 1)
+                continue
+            }
+
             // 使用统一协调器获取学者数据（中等优先级，初始化过程）
             await CitationFetchCoordinator.shared.fetchScholarComprehensive(
                 scholarId: scholar.id,

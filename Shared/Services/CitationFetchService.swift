@@ -9,13 +9,26 @@ public struct ScholarPublication: Identifiable, Codable {
     public let clusterId: String?
     public let citationCount: Int?
     public let year: Int?
-    
-    init(title: String, clusterId: String?, citationCount: Int?, year: Int?) {
+    public let authors: [String]  // 作者列表（有序，从 Google Scholar 页面直接解析）
+
+    init(title: String, clusterId: String?, citationCount: Int?, year: Int?, authors: [String] = []) {
         self.id = clusterId ?? UUID().uuidString
         self.title = title
         self.clusterId = clusterId
         self.citationCount = citationCount
         self.year = year
+        self.authors = authors
+    }
+
+    // 向后兼容：旧缓存中没有 authors 字段时默认为空数组
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        clusterId = try container.decodeIfPresent(String.self, forKey: .clusterId)
+        citationCount = try container.decodeIfPresent(Int.self, forKey: .citationCount)
+        year = try container.decodeIfPresent(Int.self, forKey: .year)
+        authors = try container.decodeIfPresent([String].self, forKey: .authors) ?? []
     }
 }
 
@@ -1039,12 +1052,63 @@ public class CitationFetchService: ObservableObject {
         let yearPattern = #"<span class="gsc_a_h[^"]*">(\d{4})</span>"#
         let yearStr = extractFirstMatch(from: html, pattern: yearPattern)
         let year = yearStr.flatMap { Int($0) }
-        
+
+        // 提取作者列表（从 gs_gray div 中解析，格式："Author1, Author2, ..."）
+        var authors: [String] = []
+
+        // Strategy 1: gs_gray div (GS profile page) — flexible class matching
+        // Handles class="gs_gray", class="gs_gray ", class="gs_gray gs_xxx", extra attributes
+        let authorPatterns = [
+            #"<div[^>]*class\s*=\s*"gs_gray[^"]*"[^>]*>(.*?)</div>"#,
+            #"<div[^>]*class\s*=\s*"gs_a[^"]*"[^>]*>(.*?)</div>"#,
+        ]
+        for ap in authorPatterns {
+            if let raw = extractFirstMatch(from: html, pattern: ap) {
+                // 取第一个 " - " 之前的部分（作者部分）
+                let parts = raw.components(separatedBy: " - ")
+                if let authorPart = parts.first {
+                    let cleaned = cleanHTML(authorPart)
+                    let parsed = cleaned.components(separatedBy: ",")
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty && $0 != "…" && $0 != "..." }
+                    if !parsed.isEmpty {
+                        authors = parsed
+                        break
+                    }
+                }
+            }
+        }
+
+        // Strategy 2: fallback — find the first <div> after the title </a> tag
+        // On some GS pages, the class names might differ
+        if authors.isEmpty {
+            let fallbackPattern = #"class="gsc_a_at"[^>]*>.*?</a>\s*<div[^>]*>(.*?)</div>"#
+            if let raw = extractFirstMatch(from: html, pattern: fallbackPattern) {
+                let cleaned = cleanHTML(raw)
+                // Verify it looks like author names (has commas, not a venue/DOI)
+                let lower = cleaned.lowercased()
+                if !lower.contains("vol.") && !lower.contains("doi:") && !lower.contains("isbn")
+                    && !lower.contains("http") && cleaned.count < 500 {
+                    let parsed = cleaned.components(separatedBy: ",")
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty && $0 != "…" && $0 != "..." }
+                    if !parsed.isEmpty {
+                        authors = parsed
+                    }
+                }
+            }
+        }
+
+        if authors.isEmpty {
+            logDebug("⚠️ No authors extracted for '\(cleanTitle.prefix(50))...'")
+        }
+
         let publication = ScholarPublication(
             title: cleanTitle,
             clusterId: clusterId,
             citationCount: citationCount,
-            year: year
+            year: year,
+            authors: authors
         )
         
         if clusterId == nil && (citationCount ?? 0) > 0 {
@@ -1065,7 +1129,9 @@ public class CitationFetchService: ObservableObject {
         
         // Google Scholar搜索结果的基本结构：
         // <div class="gs_r gs_or gs_scl">...</div>
-        let resultPattern = #"<div class="gs_r[^"]*">(.*?)</div>\s*</div>\s*</div>"#
+        // Use lookahead to capture entire result block (old pattern was too restrictive,
+        // missing gs_a div with author info)
+        let resultPattern = #"<div class="gs_r gs_or gs_scl"[^>]*>([\s\S]*?)(?=<div class="gs_r gs_or gs_scl"|<div id="gs_res_ccl_bot"|\z)"#
         
         guard let resultRegex = try? NSRegularExpression(pattern: resultPattern, options: [.dotMatchesLineSeparators]) else {
             logError("Failed to create result regex")

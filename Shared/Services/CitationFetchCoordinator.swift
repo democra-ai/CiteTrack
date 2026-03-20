@@ -147,7 +147,7 @@ public class CitationFetchCoordinator: ObservableObject {
     
     // 第一页任务不需要延迟（立即处理，快速响应）
     private let firstPageDelay: TimeInterval = 0.0  // 第一页任务无延迟
-    private let prefetchPagesCount = 3  // 预取的页数
+    private let prefetchPagesCount = 1  // 预取页数（仅下一页，减少请求）
     
     private init() {
         print("📋 [FetchCoordinator] Initialized")
@@ -206,83 +206,54 @@ public class CitationFetchCoordinator: ObservableObject {
         return true
     }
     
-    /// Fetch 全面刷新学者数据（尽可能多地获取所有信息）
-    /// 这是最常用的入口，用于：Dashboard刷新、Widget更新、AutoUpdate等
-    /// 内部使用: 多次调用 fetchScholarProfilePage()
-    /// 获取内容: 学者信息 + 论文列表（3种排序 × 3页 = 最多10次fetch）
+    /// Fetch 学者数据（精简版：仅获取第一页，最大化节省 Google Scholar 请求）
+    /// 用于：Dashboard 刷新、Widget 更新、AutoUpdate 等
+    /// 内部使用: 1 次 fetchScholarProfilePage()
+    /// 获取内容: 学者基本信息 + 第一页论文列表（按总引用排序）
+    /// 注意：其他排序和后续页面采用懒加载策略，仅在用户实际浏览时才获取
     public func fetchScholarComprehensive(
         scholarId: String,
         priority: FetchPriority = .high
     ) async {
-        print("🚀 [FetchCoordinator] Fetch Comprehensive Scholar Data: \(scholarId) (尽可能多地获取)")
-        
-        // 1. 学者基本信息（通过第一页获取，最高优先级）
+        print("🚀 [FetchCoordinator] Fetch Scholar Data (lightweight): \(scholarId)")
+
+        // 仅获取第一页（total 排序）—— 1 次请求即可获取：
+        // - 学者姓名、总引用数、h-index、i10-index
+        // - 前 100 篇论文（按引用数排序）
         _ = await fetchScholarProfilePage(scholarId: scholarId, sortBy: "total", startIndex: 0, priority: priority)
-        
-        // 2. 论文列表（三种排序的第一页，高优先级）
-        let sortOptions = ["total", "pubdate", "title"]
-        for sortBy in sortOptions {
-            if sortBy != "total" {  // total 已经在上面获取了
-                addTask(.scholarProfile(scholarId: scholarId, sortBy: sortBy, startIndex: 0), priority: priority)
-            }
-        }
-        
-        // 3. 后续页面预取（中优先级，尽可能多地获取，为 Who Cite Me 准备）
-        for sortBy in sortOptions {
-            for page in 1..<prefetchPagesCount {
-                // 使用安全的乘法，防止溢出
-                let startIndex = min(page * 100, Int.max - 1)
-                addTask(.scholarProfile(scholarId: scholarId, sortBy: sortBy, startIndex: startIndex), priority: .medium)
-            }
-        }
-        
-        // 开始处理队列（不等待完成，避免阻塞初始化流程）
-        Task {
-            await processQueue()
-        }
+
+        // 不再预取其他排序和后续页面 —— 采用懒加载策略：
+        // - pubdate/title 排序仅在用户切换排序时获取
+        // - 后续页面仅在用户滚动加载更多时获取
     }
     
-    /// Fetch 学者的所有论文（尽可能多地预取）
+    /// Fetch 学者的论文列表（懒加载策略）
     /// 用于 Who Cite Me 页面
     /// 内部使用: fetchScholarProfilePage()
     /// - Parameters:
     ///   - scholarId: 学者ID
-    ///   - sortBy: 当前选择的排序方式（只获取这一种排序的第一页，立即显示）
+    ///   - sortBy: 当前选择的排序方式
     ///   - priority: 优先级
-    ///   - onlyFirstPage: 如果为 true，只获取第一页（用于首次加载，立即显示），否则尽可能多地预取
+    ///   - onlyFirstPage: 如果为 true，只获取第一页（用于首次加载，立即显示）
     public func fetchScholarPublicationsWithPrefetch(
         scholarId: String,
         sortBy: String,
         priority: FetchPriority = .high,
         onlyFirstPage: Bool = false
     ) async {
-        print("📋 [FetchCoordinator] Fetch Scholar Publications with Prefetch: \(scholarId), sortBy: \(sortBy), onlyFirstPage: \(onlyFirstPage)")
-        
-        // 添加当前选择的排序方式的第一页（高优先级，立即显示）
+        print("📋 [FetchCoordinator] Fetch Scholar Publications: \(scholarId), sortBy: \(sortBy), onlyFirstPage: \(onlyFirstPage)")
+
+        // 获取当前排序方式的第一页（高优先级，立即显示）
         _ = await fetchScholarProfilePage(scholarId: scholarId, sortBy: sortBy, startIndex: 0, priority: priority)
-        
-        // 如果只获取第一页，处理完第一页就返回
+
         if onlyFirstPage {
-            // 不预取其他排序方式，只在用户实际切换排序时才获取
             return
         }
-        
-        // 尽可能多地预取：其他排序方式的第一页（中优先级，后台预取）
-        let allSortOptions = ["total", "pubdate", "title"]
-        for otherSortBy in allSortOptions where otherSortBy != sortBy {
-            addTask(.scholarProfile(scholarId: scholarId, sortBy: otherSortBy, startIndex: 0), priority: .medium)
-        }
-        
-        // 尽可能多地预取：后续页面的预取任务（中优先级，后台静默预取）
-        for sortByOption in allSortOptions {
-            for page in 1..<prefetchPagesCount {
-                // 使用安全的乘法，防止溢出
-                let startIndex = min(page * 100, Int.max - 1)
-                addTask(.scholarProfile(scholarId: scholarId, sortBy: sortByOption, startIndex: startIndex), priority: .medium)
-            }
-        }
-        
-        // 开始处理队列（后台继续处理剩余任务）
+
+        // 仅预取当前排序方式的下一页（不预取其他排序方式）
+        addTask(.scholarProfile(scholarId: scholarId, sortBy: sortBy, startIndex: 100), priority: .medium)
+
+        // 开始处理队列
         await processQueue()
     }
     
@@ -292,7 +263,7 @@ public class CitationFetchCoordinator: ObservableObject {
     ///   - scholarId: 学者ID
     ///   - sortBy: 排序方式
     ///   - pages: 要预取的页数（从第2页开始）
-    public func prefetchOtherPages(scholarId: String, sortBy: String, pages: Int = 2) {
+    public func prefetchOtherPages(scholarId: String, sortBy: String, pages: Int = 1) {
         for page in 1..<pages {
             // 使用安全的乘法，防止溢出
             let startIndex = min(page * 100, Int.max - 1)
@@ -376,30 +347,19 @@ public class CitationFetchCoordinator: ObservableObject {
         }
     }
     
-    /// Fetch 引用论文（尽可能多地预取）
+    /// Fetch 引用论文（精简版：仅获取当前排序的第一页）
     /// 内部使用: fetchCitedByPage()
-    /// 获取内容: 引用论文列表（2种排序 × 2页 = 最多4次fetch）
+    /// 获取内容: 引用论文列表（1 次请求）
     public func fetchCitingPapersWithPrefetch(
         clusterId: String,
+        sortByDate: Bool = true,
         priority: FetchPriority = .high
     ) async {
-        print("📋 [FetchCoordinator] Fetch Citing Papers with Prefetch: \(clusterId) (尽可能多地获取)")
-        
-        // 添加两种排序方式的第一页（高优先级）
-        _ = await fetchCitedByPage(clusterId: clusterId, sortByDate: true, startIndex: 0, priority: priority)
-        addTask(.citedBy(clusterId: clusterId, sortByDate: false, startIndex: 0), priority: priority)
-        
-        // 尽可能多地预取：后续页面的预取任务（低优先级）
-        for sortByDate in [true, false] {
-            for page in 1..<2 {  // 引用列表只预取2页
-                // 使用安全的乘法，防止溢出
-                let startIndex = min(page * 10, Int.max - 1)
-                addTask(.citedBy(clusterId: clusterId, sortByDate: sortByDate, startIndex: startIndex), priority: .low)
-            }
-        }
-        
-        // 开始处理队列
-        await processQueue()
+        print("📋 [FetchCoordinator] Fetch Citing Papers: \(clusterId), sortByDate: \(sortByDate)")
+
+        // 仅获取当前排序的第一页（1 次请求）
+        // 其他排序和后续页面在用户操作时懒加载
+        _ = await fetchCitedByPage(clusterId: clusterId, sortByDate: sortByDate, startIndex: 0, priority: priority)
     }
     
     /// 清空任务队列
