@@ -136,6 +136,19 @@ public class LocalizationManager: ObservableObject {
         }
         return key
     }
+
+    /// Convenience overload: returns the localized value if present, otherwise the
+    /// provided English fallback (useful for newly-added feature strings whose
+    /// translations are still pending).
+    public func localized(_ key: String, fallback: String) -> String {
+        if let value = localizations[currentLanguage]?[key] {
+            return value
+        }
+        if let fallbackTranslation = localizations[.english]?[key] {
+            return fallbackTranslation
+        }
+        return fallback
+    }
     
     public func switchLanguage(to language: Language, completion: @escaping () -> Void = {}) {
         guard !isLanguageSwitching else {
@@ -227,6 +240,26 @@ public class LocalizationManager: ObservableObject {
         en["privacy_disclaimer"] = en["privacy_disclaimer"] ?? "Your academic data is securely stored on your device and synced via iCloud with encryption. We value your privacy and do not collect or share your personal information."
         // Citation Insights (new feature)
         en["citation_insights"] = en["citation_insights"] ?? "Insights"
+        // AI Analysis section (new)
+        en["analysis_section_header"] = en["analysis_section_header"] ?? "AI ANALYSIS"
+        en["analysis_title"] = en["analysis_title"] ?? "Citation Analysis"
+        en["analysis_subtitle"] = en["analysis_subtitle"] ?? "Directions · Top cited · Institutions · Notable citers"
+        en["analysis_run"] = en["analysis_run"] ?? "Run analysis"
+        en["analysis_refresh"] = en["analysis_refresh"] ?? "Refresh"
+        en["analysis_starting"] = en["analysis_starting"] ?? "Starting…"
+        en["analysis_empty"] = en["analysis_empty"] ?? "Tap Run analysis to see research directions, top-cited papers, institutions, and notable citers."
+        en["analysis_no_citing"] = en["analysis_no_citing"] ?? "Load citing papers first by running an Insights batch above."
+        en["analysis_paper_count"] = en["analysis_paper_count"] ?? "%d citing papers ready"
+        en["analysis_card_directions"] = en["analysis_card_directions"] ?? "Research Directions"
+        en["analysis_card_top_cited"] = en["analysis_card_top_cited"] ?? "Top-cited Citers"
+        en["analysis_card_institutions"] = en["analysis_card_institutions"] ?? "Citing Institutions"
+        en["analysis_card_notable"] = en["analysis_card_notable"] ?? "Notable Citers"
+        en["analysis_card_empty"] = en["analysis_card_empty"] ?? "—"
+        en["analysis_authors_n"] = en["analysis_authors_n"] ?? "%d authors"
+        en["analysis_citedby_n"] = en["analysis_citedby_n"] ?? "%d total citations"
+        en["analysis_enrichment_unavailable"] = en["analysis_enrichment_unavailable"] ?? "Enrichment data unavailable yet. Institutions and notable scholars appear once papers are matched to OpenAlex."
+        en["analysis_enrich_running"] = en["analysis_enrich_running"] ?? "Looking up OpenAlex…"
+        en["analysis_enrich_progress"] = en["analysis_enrich_progress"] ?? "OpenAlex %d / %d"
         localizations[.english] = en
 
         // Chinese (Simplified)
@@ -279,6 +312,26 @@ public class LocalizationManager: ObservableObject {
         zh["privacy_disclaimer"] = zh["privacy_disclaimer"] ?? "您的学术数据将安全存储在本地设备上，并通过 iCloud 进行加密同步。我们重视您的隐私，不会收集或分享您的个人信息。"
         // Citation Insights (new feature)
         zh["citation_insights"] = zh["citation_insights"] ?? "引用洞察"
+        // AI Analysis section (new)
+        zh["analysis_section_header"] = zh["analysis_section_header"] ?? "AI 分析"
+        zh["analysis_title"] = zh["analysis_title"] ?? "引用分析"
+        zh["analysis_subtitle"] = zh["analysis_subtitle"] ?? "研究方向 · 高引论文 · 引用机构 · 知名学者"
+        zh["analysis_run"] = zh["analysis_run"] ?? "开始分析"
+        zh["analysis_refresh"] = zh["analysis_refresh"] ?? "刷新"
+        zh["analysis_starting"] = zh["analysis_starting"] ?? "正在启动…"
+        zh["analysis_empty"] = zh["analysis_empty"] ?? "点击开始分析以查看研究方向、高引论文、引用机构和知名引用者。"
+        zh["analysis_no_citing"] = zh["analysis_no_citing"] ?? "请先在上方运行引用批量分析以加载引用论文。"
+        zh["analysis_paper_count"] = zh["analysis_paper_count"] ?? "已就绪 %d 篇引用论文"
+        zh["analysis_card_directions"] = zh["analysis_card_directions"] ?? "研究方向"
+        zh["analysis_card_top_cited"] = zh["analysis_card_top_cited"] ?? "高引论文"
+        zh["analysis_card_institutions"] = zh["analysis_card_institutions"] ?? "引用机构"
+        zh["analysis_card_notable"] = zh["analysis_card_notable"] ?? "知名学者"
+        zh["analysis_card_empty"] = zh["analysis_card_empty"] ?? "—"
+        zh["analysis_authors_n"] = zh["analysis_authors_n"] ?? "%d 位作者"
+        zh["analysis_citedby_n"] = zh["analysis_citedby_n"] ?? "总引用 %d"
+        zh["analysis_enrichment_unavailable"] = zh["analysis_enrichment_unavailable"] ?? "暂时无法获取增强数据。当论文与 OpenAlex 匹配后，机构和知名学者将自动出现。"
+        zh["analysis_enrich_running"] = zh["analysis_enrich_running"] ?? "正在查询 OpenAlex…"
+        zh["analysis_enrich_progress"] = zh["analysis_enrich_progress"] ?? "OpenAlex %d / %d"
         localizations[.chinese] = zh
     }
     

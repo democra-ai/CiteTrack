@@ -84,6 +84,49 @@ struct CitationInsightsView: View {
         dataManager.scholars.first(where: { $0.id == selectedScholarId })?.name ?? ""
     }
 
+    /// Currently-selected Scholar object (nil if none picked).
+    private var currentScholar: Scholar? {
+        dataManager.scholars.first(where: { $0.id == selectedScholarId })
+    }
+
+    /// Publications to feed into the analysis API (drawn from picker state with author info).
+    private var publicationsForAnalysis: [ScholarPublication] {
+        publicationsWithAuthors.map { pwa in
+            ScholarPublication(
+                title: pwa.title,
+                clusterId: pwa.id,
+                citationCount: pwa.citationCount,
+                year: pwa.year,
+                authors: pwa.authors
+            )
+        }
+    }
+
+    /// Flatten and dedupe citing papers from analyzed publication results so we can ship
+    /// them to the backend analysis worker.
+    private var citingPapersForAnalysis: [CitingPaper] {
+        guard let scholarId = selectedScholarId else { return [] }
+        var byId: [String: CitingPaper] = [:]
+        for pub in publicationResults {
+            for cp in pub.citingPapers {
+                if byId[cp.id] != nil { continue }
+                byId[cp.id] = CitingPaper(
+                    id: cp.id,
+                    title: cp.citingPaperTitle,
+                    authors: cp.citingAuthors,
+                    year: cp.citingYear,
+                    venue: nil,
+                    citationCount: nil,
+                    abstract: cp.contexts.isEmpty ? nil : cp.contexts.joined(separator: " "),
+                    scholarUrl: nil,
+                    pdfUrl: nil,
+                    citedScholarId: scholarId
+                )
+            }
+        }
+        return Array(byId.values)
+    }
+
     /// IDs of publications that have already been analyzed and saved
     private var alreadyAnalyzedIds: Set<String> {
         Set(publicationResults.map { $0.id })
@@ -281,6 +324,14 @@ struct CitationInsightsView: View {
             if hasFetched && !contextService.batchProgress.isRunning {
                 Section {
                     summaryCard
+                }
+
+                if let scholar = currentScholar, !citingPapersForAnalysis.isEmpty {
+                    AnalysisInsightsSection(
+                        scholar: scholar,
+                        publications: publicationsForAnalysis,
+                        citingPapers: citingPapersForAnalysis
+                    )
                 }
 
                 Section("Your Publications (\(publicationResults.count))") {

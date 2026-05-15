@@ -1,0 +1,25 @@
+{
+  "name": "citetrack-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cfman wrangler --account claude-citetrack-deploy dev",
+    "deploy": "cfman wrangler --account claude-citetrack-deploy deploy",
+    "typecheck": "tsc --noEmit",
+    "db:apply:local": "cfman wrangler --account claude-citetrack-deploy d1 execute citetrack-analysis --local --file=./migrations/0001_init.sql",
+    "db:apply:remote": "cfman wrangler --account claude-citetrack-deploy d1 execute citetrack-analysis --remote --file=./migrations/0001_init.sql"
+  },
+  "dependencies": {
+    "hono": "^4.6.13",
+    "@langchain/core": "^0.3.30",
+    "@langchain/cloudflare": "^0.1.0",
+    "langchain": "^0.3.7",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.85.0"
+  }
+}

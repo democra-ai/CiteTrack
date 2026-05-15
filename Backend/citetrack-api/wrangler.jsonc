@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "citetrack-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "41ebb4f61f901310c3acf958bbf08e4d",
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
+  "routes": [
+    {
+      "pattern": "citetrack-api.democra.ai",
+      "custom_domain": true
+    }
+  ],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "citetrack-analysis",
+      "database_id": "ba095c54-3b6e-4dd9-a5c1-1336e7280167"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "ab66d02ceda742bfbe92af5a86f612b4"
+    }
+  ],
+
+  "ai": {
+    "binding": "AI"
+  },
+
+  "vars": {
+    "OPENALEX_MAILTO": "tao.shen@zju.edu.cn",
+    "ALLOWED_ACCESS_AUDS": "e5007772fcf600453254359e85b66999e8b4d47bf0c086f99624d3c22b499d1d",
+    "ALLOWED_ACCESS_DOMAINS": "tauon.cloudflareaccess.com"
+  }
+}
