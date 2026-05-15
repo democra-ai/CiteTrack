@@ -69,6 +69,11 @@
 		CC006B001CC006B001CC006B00 /* CitationContextSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC006F001CC006F001CC006F00 /* CitationContextSection.swift */; };
 		CC007B001CC007B001CC007B00 /* CitationInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC007F001CC007F001CC007F00 /* CitationInsightsView.swift */; };
 		GSIGNIN001BuildF0000000000 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = GSIGNIN001ProdRef000000000 /* GoogleSignIn */; };
+		6486323101F9CF826740578A /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B89A2A101E3BE25776FA273 /* AnalysisResult.swift */; };
+		49CC9EE0F4189DBF0FFFF022 /* CiteTrackAPIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD629052EE3421B0239BCEC /* CiteTrackAPIConfig.swift */; };
+		3085EB1AF5F0B78A86FE0C69 /* CiteTrackAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74153BB7A2BA2D80269E719 /* CiteTrackAnalysisService.swift */; };
+		317539002D63CBF91EBF9822 /* OpenAlexEnrichmentClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B4FC42C9660C13B358137F /* OpenAlexEnrichmentClient.swift */; };
+		7362ECBCFB70E3AD85BF1157 /* AnalysisInsightsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F587B3FAF89C8BFE3D598D /* AnalysisInsightsSection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -159,6 +164,11 @@
 		CC005F001CC005F001CC005F00 /* GoogleSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GoogleSignInView.swift; path = CiteTrack/Views/Auth/GoogleSignInView.swift; sourceTree = SOURCE_ROOT; };
 		CC006F001CC006F001CC006F00 /* CitationContextSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CitationContextSection.swift; path = ./CiteTrack/Views/CitationContextSection.swift; sourceTree = "<group>"; };
 		CC007F001CC007F001CC007F00 /* CitationInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CitationInsightsView.swift; path = ./CiteTrack/Views/CitationInsightsView.swift; sourceTree = "<group>"; };
+		5B89A2A101E3BE25776FA273 /* AnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AnalysisResult.swift; path = ../Shared/Models/AnalysisResult.swift; sourceTree = "<group>"; };
+		5BD629052EE3421B0239BCEC /* CiteTrackAPIConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CiteTrackAPIConfig.swift; path = ../Shared/Services/CiteTrackAPIConfig.swift; sourceTree = "<group>"; };
+		F74153BB7A2BA2D80269E719 /* CiteTrackAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CiteTrackAnalysisService.swift; path = ../Shared/Services/CiteTrackAnalysisService.swift; sourceTree = "<group>"; };
+		68B4FC42C9660C13B358137F /* OpenAlexEnrichmentClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OpenAlexEnrichmentClient.swift; path = ../Shared/Services/OpenAlexEnrichmentClient.swift; sourceTree = "<group>"; };
+		28F587B3FAF89C8BFE3D598D /* AnalysisInsightsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AnalysisInsightsSection.swift; path = ./CiteTrack/Views/AnalysisInsightsSection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -315,6 +325,9 @@
 				3827C421D2D48677F5EFF151 /* CitationFetchService+ScholarInfo.swift */,
 				CC002F001CC002F001CC002F00 /* SemanticScholarService.swift */,
 				CC003F001CC003F001CC003F00 /* CitationContextService.swift */,
+				5BD629052EE3421B0239BCEC /* CiteTrackAPIConfig.swift */,
+				F74153BB7A2BA2D80269E719 /* CiteTrackAnalysisService.swift */,
+				68B4FC42C9660C13B358137F /* OpenAlexEnrichmentClient.swift */,
 			);
 			name = Services;
 			sourceTree = "<group>";
@@ -356,6 +369,7 @@
 				2DB6F2C5C0B1FE88EB9DD874 /* CitingAuthor.swift */,
 				F92941C320908B67A09C110F /* CitingPaper.swift */,
 				CC001F001CC001F001CC001F00 /* CitationContext.swift */,
+				5B89A2A101E3BE25776FA273 /* AnalysisResult.swift */,
 			);
 			name = Models;
 			sourceTree = "<group>";
@@ -389,6 +403,7 @@
 				CC006F001CC006F001CC006F00 /* CitationContextSection.swift */,
 				CC007F001CC007F001CC007F00 /* CitationInsightsView.swift */,
 				CC008GRP01CC008GRP01CC008 /* Auth */,
+				28F587B3FAF89C8BFE3D598D /* AnalysisInsightsSection.swift */,
 			);
 			name = Views;
 			sourceTree = "<group>";
@@ -584,6 +599,11 @@
 				CC005B001CC005B001CC005B00 /* GoogleSignInView.swift in Sources */,
 				CC006B001CC006B001CC006B00 /* CitationContextSection.swift in Sources */,
 				CC007B001CC007B001CC007B00 /* CitationInsightsView.swift in Sources */,
+				6486323101F9CF826740578A /* AnalysisResult.swift in Sources */,
+				49CC9EE0F4189DBF0FFFF022 /* CiteTrackAPIConfig.swift in Sources */,
+				3085EB1AF5F0B78A86FE0C69 /* CiteTrackAnalysisService.swift in Sources */,
+				317539002D63CBF91EBF9822 /* OpenAlexEnrichmentClient.swift in Sources */,
+				7362ECBCFB70E3AD85BF1157 /* AnalysisInsightsSection.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

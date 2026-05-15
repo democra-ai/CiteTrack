@@ -4428,57 +4428,73 @@ extension Notification.Name {
                 let index = column * rows + row
                 let value = index < data.count ? data[index] : 0.0
                 let isSelected = selectedBlock?.row == row && selectedBlock?.column == column
-                
-                Rectangle()
-                    .fill(colorForValue(value, isSelected: isSelected))
-                    .frame(width: blockSize, height: blockSize)
-                    .cornerRadius(max(1, blockSize * 0.15))
-                    .overlay(
-                        // 选中时的发光边框
-                        RoundedRectangle(cornerRadius: max(1, blockSize * 0.15))
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.9), Color.white.opacity(0.6)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: isSelected ? 2 : 0
-                            )
-                    )
-                    .shadow(
-                        color: isSelected ? Color.white.opacity(0.8) : Color.clear,
-                        radius: isSelected ? 8 : 0,
-                        x: 0,
-                        y: isSelected ? 4 : 0
-                    )
-                    .shadow(
-                        color: isSelected ? Color.white.opacity(0.6) : Color.clear,
-                        radius: isSelected ? 12 : 0,
-                        x: 0,
-                        y: isSelected ? 6 : 0
-                    )
-                    .shadow(
-                        color: isSelected ? Color.white.opacity(0.4) : Color.clear,
-                        radius: isSelected ? 16 : 0,
-                        x: 0,
-                        y: isSelected ? 8 : 0
-                    )
-                    .scaleEffect(isSelected ? 1.15 : 1.0)
-                    .offset(y: isSelected ? -2 : 0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0), value: isSelected)
-                    .onTapGesture {
-                        handleBlockTap(row: row, column: column, geometry: geometry)
-                    }
-                    .simultaneousGesture(
-                        TapGesture()
-                            .onEnded { _ in
-                                // 阻止事件传播到父级
-                            }
-                    )
-                    .onLongPressGesture(minimumDuration: 0.1) {
-                        handleBlockLongPress(row: row, column: column, geometry: geometry)
-                    }
+
+                heatmapBlock(row: row, column: column, value: value, isSelected: isSelected, geometry: geometry)
             }
         }
+    }
+
+    @ViewBuilder
+    private func heatmapBlock(row: Int, column: Int, value: Double, isSelected: Bool, geometry: GeometryProxy) -> some View {
+        Rectangle()
+            .fill(colorForValue(value, isSelected: isSelected))
+            .frame(width: blockSize, height: blockSize)
+            .cornerRadius(max(1, blockSize * 0.15))
+            .modifier(HeatmapBlockSelectionEffect(isSelected: isSelected, blockSize: blockSize))
+            .onTapGesture {
+                handleBlockTap(row: row, column: column, geometry: geometry)
+            }
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded { _ in
+                        // 阻止事件传播到父级
+                    }
+            )
+            .onLongPressGesture(minimumDuration: 0.1) {
+                handleBlockLongPress(row: row, column: column, geometry: geometry)
+            }
+    }
+}
+
+// Selection glow + scale + animation, extracted as a ViewModifier so the
+// heatmap block's modifier chain stays small enough for Swift's type checker.
+private struct HeatmapBlockSelectionEffect: ViewModifier {
+    let isSelected: Bool
+    let blockSize: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                RoundedRectangle(cornerRadius: max(1, blockSize * 0.15))
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.9), Color.white.opacity(0.6)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: isSelected ? 2 : 0
+                    )
+            )
+            .shadow(
+                color: isSelected ? Color.white.opacity(0.8) : Color.clear,
+                radius: isSelected ? 8 : 0,
+                x: 0,
+                y: isSelected ? 4 : 0
+            )
+            .shadow(
+                color: isSelected ? Color.white.opacity(0.6) : Color.clear,
+                radius: isSelected ? 12 : 0,
+                x: 0,
+                y: isSelected ? 6 : 0
+            )
+            .shadow(
+                color: isSelected ? Color.white.opacity(0.4) : Color.clear,
+                radius: isSelected ? 16 : 0,
+                x: 0,
+                y: isSelected ? 8 : 0
+            )
+            .scaleEffect(isSelected ? 1.15 : 1.0)
+            .offset(y: isSelected ? -2 : 0)
+            .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0), value: isSelected)
     }
 }

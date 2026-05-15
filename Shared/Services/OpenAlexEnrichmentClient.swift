@@ -78,7 +78,7 @@ public final class OpenAlexEnrichmentClient {
         let now = Date()
 
         // Stage 1: resolve each paper to an OpenAlex work
-        let resolved = await runBatched(citingPapers, concurrency: concurrency) { paper in
+        let resolved: [(String, OpenAlexWork?)] = await runBatched(citingPapers, concurrency: concurrency) { paper -> (String, OpenAlexWork?) in
             let cacheKey = self.workCacheCacheKey(title: paper.title, year: paper.year)
             if let cached = workCache[cacheKey], cached.expiresAt > now, let work = cached.work {
                 return (paper.id, work)
@@ -142,7 +142,7 @@ public final class OpenAlexEnrichmentClient {
                 let cited = cached?.citedByCount
                 let works = cached?.worksCount
                 let orcid = ship.author.orcid ?? cached?.orcid
-                let institutions: [EnrichedInstitution] = (ship.institutions ?? []).map { inst in
+                let institutions: [EnrichedInstitution] = (ship.institutions ?? [OpenAlexInstitution]()).map { (inst: OpenAlexInstitution) -> EnrichedInstitution in
                     EnrichedInstitution(
                         openalexId: inst.id,
                         rorId: inst.ror,
