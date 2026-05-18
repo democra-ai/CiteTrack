@@ -46,6 +46,7 @@
 		FIREBASE0D2E7600000088055D /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = FIREBASE0E2E7600000088055D /* FirebaseCrashlytics */; };
 		GSPLIST0A2E7600IOSBUILD1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = GSPLIST0B2E7600IOSFILEREF /* GoogleService-Info.plist */; };
 		E202DA3C2E732DE80088055D /* ConfettiSwiftUI in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = E202DA3B2E732DE80088055D /* ConfettiSwiftUI */; };
+		POW0BUILDFILE000000000001 /* Pow in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = POW0PRODUCTDEP000000000002 /* Pow */; };
 		E202DA3F2E7335A60088055D /* SwiftEntryKit in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = E202DA3E2E7335A60088055D /* SwiftEntryKit */; };
 		E20408872E73E735000620AA /* WSOnBoarding in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = E20408862E73E735000620AA /* WSOnBoarding */; };
 		E28462172E744FA20040CDC6 /* SwiftUICharts in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = E28462162E744FA20040CDC6 /* SwiftUICharts */; };
@@ -74,6 +75,7 @@
 		3085EB1AF5F0B78A86FE0C69 /* CiteTrackAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74153BB7A2BA2D80269E719 /* CiteTrackAnalysisService.swift */; };
 		317539002D63CBF91EBF9822 /* OpenAlexEnrichmentClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B4FC42C9660C13B358137F /* OpenAlexEnrichmentClient.swift */; };
 		7362ECBCFB70E3AD85BF1157 /* AnalysisInsightsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F587B3FAF89C8BFE3D598D /* AnalysisInsightsSection.swift */; };
+		1356C8AE5DA1C261DE15FEF1 /* HaiyouScoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D9D4F43B6FFA10A2A488579 /* HaiyouScoreView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -169,6 +171,7 @@
 		F74153BB7A2BA2D80269E719 /* CiteTrackAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CiteTrackAnalysisService.swift; path = ../Shared/Services/CiteTrackAnalysisService.swift; sourceTree = "<group>"; };
 		68B4FC42C9660C13B358137F /* OpenAlexEnrichmentClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OpenAlexEnrichmentClient.swift; path = ../Shared/Services/OpenAlexEnrichmentClient.swift; sourceTree = "<group>"; };
 		28F587B3FAF89C8BFE3D598D /* AnalysisInsightsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AnalysisInsightsSection.swift; path = ./CiteTrack/Views/AnalysisInsightsSection.swift; sourceTree = "<group>"; };
+		2D9D4F43B6FFA10A2A488579 /* HaiyouScoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HaiyouScoreView.swift; path = ./CiteTrack/Views/HaiyouScoreView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +184,7 @@
 				E29641D92E74876E00F2192F /* ContributionChart in Frameworks */,
 				E202DA3F2E7335A60088055D /* SwiftEntryKit in Frameworks */,
 				E202DA3C2E732DE80088055D /* ConfettiSwiftUI in Frameworks */,
+				POW0BUILDFILE000000000001 /* Pow in Frameworks */,
 				FIREBASE0B2E7600000088055D /* FirebaseAnalytics in Frameworks */,
 				FIREBASE0D2E7600000088055D /* FirebaseCrashlytics in Frameworks */,
 				GSIGNIN001BuildF0000000000 /* GoogleSignIn in Frameworks */,
@@ -404,6 +408,7 @@
 				CC007F001CC007F001CC007F00 /* CitationInsightsView.swift */,
 				CC008GRP01CC008GRP01CC008 /* Auth */,
 				28F587B3FAF89C8BFE3D598D /* AnalysisInsightsSection.swift */,
+				2D9D4F43B6FFA10A2A488579 /* HaiyouScoreView.swift */,
 			);
 			name = Views;
 			sourceTree = "<group>";
@@ -501,6 +506,7 @@
 			mainGroup = 24E80B0B24E80B0B24E80B0B24E80;
 			packageReferences = (
 				E202DA3A2E732DE80088055D /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */,
+				POW0PKGREF0000000000000003 /* XCRemoteSwiftPackageReference "Pow" */,
 				E202DA3D2E7335A60088055D /* XCRemoteSwiftPackageReference "SwiftEntryKit" */,
 				E20408852E73E735000620AA /* XCRemoteSwiftPackageReference "WSOnBoarding" */,
 				E28462152E744FA20040CDC6 /* XCRemoteSwiftPackageReference "ChartView" */,
@@ -604,6 +610,7 @@
 				3085EB1AF5F0B78A86FE0C69 /* CiteTrackAnalysisService.swift in Sources */,
 				317539002D63CBF91EBF9822 /* OpenAlexEnrichmentClient.swift in Sources */,
 				7362ECBCFB70E3AD85BF1157 /* AnalysisInsightsSection.swift in Sources */,
+				1356C8AE5DA1C261DE15FEF1 /* HaiyouScoreView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -929,6 +936,14 @@
 				minimumVersion = 2.0.3;
 			};
 		};
+		POW0PKGREF0000000000000003 /* XCRemoteSwiftPackageReference "Pow" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EmergeTools/Pow";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 		E202DA3D2E7335A60088055D /* XCRemoteSwiftPackageReference "SwiftEntryKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/huri000/SwiftEntryKit";
@@ -984,6 +999,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E202DA3A2E732DE80088055D /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */;
 			productName = ConfettiSwiftUI;
+		};
+		POW0PRODUCTDEP000000000002 /* Pow */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = POW0PKGREF0000000000000003 /* XCRemoteSwiftPackageReference "Pow" */;
+			productName = Pow;
 		};
 		E202DA3E2E7335A60088055D /* SwiftEntryKit */ = {
 			isa = XCSwiftPackageProductDependency;

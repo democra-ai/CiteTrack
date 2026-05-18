@@ -131,3 +131,101 @@ public struct AnalysisJobResponse: Codable {
     public let jobId: String
     public let status: String
 }
+
+// MARK: - 海优 simulated scoring
+
+public struct RepresentativePaperInput: Codable, Hashable, Identifiable {
+    public var id = UUID()
+    public var title: String
+    public var year: Int?
+    public var authorRole: String?
+    public var journal: String?
+    public var impactFactor: Double?
+    public var citationCount: Int?
+    public var esiHighlyCited: Bool?
+
+    public init(
+        title: String = "",
+        year: Int? = nil,
+        authorRole: String? = nil,
+        journal: String? = nil,
+        impactFactor: Double? = nil,
+        citationCount: Int? = nil,
+        esiHighlyCited: Bool? = nil
+    ) {
+        self.title = title
+        self.year = year
+        self.authorRole = authorRole
+        self.journal = journal
+        self.impactFactor = impactFactor
+        self.citationCount = citationCount
+        self.esiHighlyCited = esiHighlyCited
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, year, authorRole, journal, impactFactor, citationCount, esiHighlyCited
+    }
+}
+
+public struct DimensionScore: Codable, Hashable, Identifiable {
+    public let key: String
+    public let label: String
+    public let maxScore: Double
+    public let score: Double
+    public let confidence: String
+    public let reasoning: String
+    public let evidence: [String]
+    public let suggestions: [String]
+    public var id: String { key }
+}
+
+public struct HaiyouDataCompleteness: Codable, Hashable {
+    public let hasAnalysis: Bool
+    public let hasCvText: Bool
+    public let hasReturnPlan: Bool
+    public let representativePaperCount: Int
+}
+
+public struct HaiyouScoreReport: Codable, Hashable {
+    public let scholarId: String
+    public let generatedAt: Date
+    public let dimensions: [DimensionScore]
+    public let totalScore: Double
+    public let maxTotal: Double
+    public let fundingPrediction: String // priority | approved | rejected
+    public let overallAssessment: String
+    public let topSuggestions: [String]
+    public let dataCompleteness: HaiyouDataCompleteness
+
+    private enum CodingKeys: String, CodingKey {
+        case scholarId, generatedAt, dimensions, totalScore, maxTotal
+        case fundingPrediction, overallAssessment, topSuggestions, dataCompleteness
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        scholarId = try c.decode(String.self, forKey: .scholarId)
+        let ts = try c.decodeIfPresent(Int64.self, forKey: .generatedAt) ?? 0
+        generatedAt = Date(timeIntervalSince1970: TimeInterval(ts) / 1000)
+        dimensions = try c.decodeIfPresent([DimensionScore].self, forKey: .dimensions) ?? []
+        totalScore = try c.decode(Double.self, forKey: .totalScore)
+        maxTotal = try c.decodeIfPresent(Double.self, forKey: .maxTotal) ?? 100
+        fundingPrediction = try c.decode(String.self, forKey: .fundingPrediction)
+        overallAssessment = try c.decodeIfPresent(String.self, forKey: .overallAssessment) ?? ""
+        topSuggestions = try c.decodeIfPresent([String].self, forKey: .topSuggestions) ?? []
+        dataCompleteness = try c.decode(HaiyouDataCompleteness.self, forKey: .dataCompleteness)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(scholarId, forKey: .scholarId)
+        try c.encode(Int64(generatedAt.timeIntervalSince1970 * 1000), forKey: .generatedAt)
+        try c.encode(dimensions, forKey: .dimensions)
+        try c.encode(totalScore, forKey: .totalScore)
+        try c.encode(maxTotal, forKey: .maxTotal)
+        try c.encode(fundingPrediction, forKey: .fundingPrediction)
+        try c.encode(overallAssessment, forKey: .overallAssessment)
+        try c.encode(topSuggestions, forKey: .topSuggestions)
+        try c.encode(dataCompleteness, forKey: .dataCompleteness)
+    }
+}

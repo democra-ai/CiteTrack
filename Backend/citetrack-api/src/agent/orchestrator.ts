@@ -1,10 +1,17 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { StructuredTool } from "@langchain/core/tools";
-import type { Env, AnalysisResult, AnalyzeRequest } from "../types";
+import type {
+  Env,
+  AnalysisResult,
+  AnalyzeRequest,
+  HaiyouScoreRequest,
+} from "../types";
 import {
   clearScholarCitingData,
   createJob,
+  getLatestAnalysisResult,
   insertCitingPapers,
+  saveHaiyouScore,
   updateJob,
   upsertPublications,
   upsertScholar,
@@ -14,6 +21,7 @@ import { makeClusterTopicsTool } from "./tools/cluster_topics";
 import { makeRankTopCitedTool } from "./tools/rank_top_cited";
 import { makeExtractInstitutionsTool } from "./tools/extract_institutions";
 import { makeFindNotableScholarsTool } from "./tools/find_notable_scholars";
+import { runHaiyouScoring } from "./scoring/haiyou";
 
 export async function startAnalysisJob(
   env: Env,
@@ -28,6 +36,69 @@ export async function startAnalysisJob(
   await clearScholarCitingData(env.DB, req.scholarId);
   await insertCitingPapers(env.DB, req.scholarId, req.citingPapers);
   return createJob(env.DB, req.scholarId, req.citingPapers.length);
+}
+
+export async function startHaiyouScoreJob(
+  env: Env,
+  req: HaiyouScoreRequest
+): Promise<string> {
+  return createJob(env.DB, req.scholarId, 0, "haiyou");
+}
+
+export async function runHaiyouScoreJob(
+  env: Env,
+  jobId: string,
+  req: HaiyouScoreRequest
+): Promise<void> {
+  const tStart = Date.now();
+  try {
+    await updateJob(env.DB, jobId, {
+      status: "running",
+      started: true,
+      progress: 10,
+      currentStep: "loading analysis",
+    });
+
+    const analysis = (await getLatestAnalysisResult(
+      env.DB,
+      req.scholarId
+    )) as AnalysisResult | null;
+
+    await updateJob(env.DB, jobId, {
+      progress: 25,
+      currentStep: "scoring 5 dimensions",
+    });
+
+    const report = await runHaiyouScoring(env.AI, { ...req, analysis });
+
+    await saveHaiyouScore(
+      env.DB,
+      req.scholarId,
+      report.totalScore,
+      report.fundingPrediction,
+      JSON.stringify(report)
+    );
+
+    await updateJob(env.DB, jobId, {
+      status: "done",
+      progress: 100,
+      currentStep: "done",
+      completed: true,
+      resultJson: JSON.stringify({
+        report,
+        totalMs: Date.now() - tStart,
+      }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await updateJob(env.DB, jobId, {
+      status: "error",
+      error: msg,
+      currentStep: "failed",
+      completed: true,
+      resultJson: JSON.stringify({ error: msg }),
+    });
+  }
 }
 
 interface ToolCallTrace {

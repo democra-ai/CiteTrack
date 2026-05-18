@@ -319,15 +319,16 @@ export async function clearTopicClusters(db: D1Database, scholarId: string): Pro
 export async function createJob(
   db: D1Database,
   scholarId: string,
-  citingPapersCount: number
+  citingPapersCount: number,
+  kind: string = "analysis"
 ): Promise<string> {
   const id = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO analysis_jobs (id, scholar_id, status, progress, current_step, citing_papers_count, created_at)
-       VALUES (?, ?, 'pending', 0, 'queued', ?, ?)`
+      `INSERT INTO analysis_jobs (id, scholar_id, status, progress, current_step, citing_papers_count, created_at, kind)
+       VALUES (?, ?, 'pending', 0, 'queued', ?, ?, ?)`
     )
-    .bind(id, scholarId, citingPapersCount, Date.now())
+    .bind(id, scholarId, citingPapersCount, Date.now(), kind)
     .run();
   return id;
 }
@@ -420,17 +421,64 @@ export async function getJob(db: D1Database, id: string): Promise<JobRecord | nu
 
 export async function getLatestJobResult(
   db: D1Database,
-  scholarId: string
+  scholarId: string,
+  kind: string = "analysis"
 ): Promise<{ resultJson: string; completedAt: number } | null> {
   const row = await db
     .prepare(
       `SELECT result_json, completed_at
        FROM analysis_jobs
-       WHERE scholar_id = ? AND status = 'done' AND result_json IS NOT NULL
+       WHERE scholar_id = ? AND kind = ? AND status = 'done' AND result_json IS NOT NULL
        ORDER BY completed_at DESC LIMIT 1`
     )
-    .bind(scholarId)
+    .bind(scholarId, kind)
     .first<{ result_json: string; completed_at: number }>();
   if (!row) return null;
   return { resultJson: row.result_json, completedAt: row.completed_at };
+}
+
+/** Fetch + parse the latest completed analysis result (the `.result` payload). */
+export async function getLatestAnalysisResult(
+  db: D1Database,
+  scholarId: string
+): Promise<unknown | null> {
+  const latest = await getLatestJobResult(db, scholarId, "analysis");
+  if (!latest) return null;
+  try {
+    const parsed = JSON.parse(latest.resultJson) as { result?: unknown };
+    return parsed.result ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveHaiyouScore(
+  db: D1Database,
+  scholarId: string,
+  totalScore: number,
+  fundingPrediction: string,
+  reportJson: string
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO haiyou_scores (id, scholar_id, total_score, funding_prediction, report_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .bind(crypto.randomUUID(), scholarId, totalScore, fundingPrediction, reportJson, Date.now())
+    .run();
+}
+
+export async function getLatestHaiyouScore(
+  db: D1Database,
+  scholarId: string
+): Promise<{ reportJson: string; createdAt: number } | null> {
+  const row = await db
+    .prepare(
+      `SELECT report_json, created_at FROM haiyou_scores
+       WHERE scholar_id = ? ORDER BY created_at DESC LIMIT 1`
+    )
+    .bind(scholarId)
+    .first<{ report_json: string; created_at: number }>();
+  if (!row) return null;
+  return { reportJson: row.report_json, createdAt: row.created_at };
 }

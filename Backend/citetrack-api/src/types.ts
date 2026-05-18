@@ -129,3 +129,53 @@ export interface AnalysisResult {
   citingInstitutions: CitingInstitution[];
   notableCiters: NotableCiter[];
 }
+
+// ---- 海优 (Overseas Excellent Young Scientists) simulated scoring ----
+
+export interface RepresentativePaperInput {
+  title: string;
+  year: number | null;
+  authorRole?: string | null; // 唯一一作 / 共同一作 / 唯一通讯 / 同通讯 / 其他
+  journal?: string | null;
+  impactFactor?: number | null;
+  citationCount?: number | null;
+  esiHighlyCited?: boolean | null;
+}
+
+export interface HaiyouScoreRequest {
+  scholarId: string;
+  scholarName?: string | null;
+  cvText?: string | null; // 教育/工作经历自由文本（维度1用）
+  returnPlanText?: string | null; // 回国设想与依托单位支持（维度5用）
+  representativePapers?: RepresentativePaperInput[];
+}
+
+export type FundingPrediction = "priority" | "approved" | "rejected";
+
+export interface DimensionScore {
+  key: string;
+  label: string; // 中文维度名
+  maxScore: number;
+  score: number;
+  confidence: "high" | "medium" | "low";
+  reasoning: string;
+  evidence: string[];
+  suggestions: string[];
+}
+
+export interface HaiyouScoreReport {
+  scholarId: string;
+  generatedAt: number;
+  dimensions: DimensionScore[];
+  totalScore: number;
+  maxTotal: number; // 100
+  fundingPrediction: FundingPrediction; // >=85 priority, 70-84 approved, <70 rejected
+  overallAssessment: string;
+  topSuggestions: string[];
+  dataCompleteness: {
+    hasAnalysis: boolean;
+    hasCvText: boolean;
+    hasReturnPlan: boolean;
+    representativePaperCount: number;
+  };
+}

@@ -1,9 +1,14 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
-import type { Env, AnalyzeRequest } from "../types";
-import { runAnalysisJob, startAnalysisJob } from "../agent/orchestrator";
-import { getJob, getLatestJobResult } from "../db/queries";
+import type { Env, AnalyzeRequest, HaiyouScoreRequest } from "../types";
+import {
+  runAnalysisJob,
+  runHaiyouScoreJob,
+  startAnalysisJob,
+  startHaiyouScoreJob,
+} from "../agent/orchestrator";
+import { getJob, getLatestHaiyouScore, getLatestJobResult } from "../db/queries";
 
 const citingPaperSchema = z.object({
   id: z.string().min(1).max(128),
@@ -145,6 +150,84 @@ export function makeAnalyzeRouter() {
       headers: { "content-type": "application/json", "x-completed-at": String(latest.completedAt) },
     });
   });
+
+  // ---- 海优 simulated scoring ----
+
+  const repPaperSchema = z.object({
+    title: z.string().min(1).max(2048),
+    year: z.number().int().nullable().optional(),
+    authorRole: z.string().max(64).nullable().optional(),
+    journal: z.string().max(256).nullable().optional(),
+    impactFactor: z.number().nullable().optional(),
+    citationCount: z.number().int().nullable().optional(),
+    esiHighlyCited: z.boolean().nullable().optional(),
+  });
+
+  const haiyouBody = z.object({
+    scholarName: z.string().max(256).nullable().optional(),
+    cvText: z.string().max(20000).nullable().optional(),
+    returnPlanText: z.string().max(20000).nullable().optional(),
+    representativePapers: z.array(repPaperSchema).max(20).optional(),
+  });
+
+  app.post(
+    "/v1/scholars/:id/haiyou-score",
+    async (c: Context<{ Bindings: Env }>) => {
+      const id = c.req.param("id");
+      if (!id) return c.json({ error: "missing_id" }, 400);
+      let body: z.infer<typeof haiyouBody> = {};
+      try {
+        const raw = await c.req.json().catch(() => ({}));
+        const parsed = haiyouBody.safeParse(raw ?? {});
+        if (!parsed.success) {
+          return c.json(
+            { error: "validation_error", issues: parsed.error.flatten() },
+            400
+          );
+        }
+        body = parsed.data;
+      } catch (e) {
+        return c.json({ error: "bad_json", detail: String(e) }, 400);
+      }
+
+      const req: HaiyouScoreRequest = {
+        scholarId: id,
+        scholarName: body.scholarName ?? null,
+        cvText: body.cvText ?? null,
+        returnPlanText: body.returnPlanText ?? null,
+        representativePapers: (body.representativePapers ?? []).map((p) => ({
+          title: p.title,
+          year: p.year ?? null,
+          authorRole: p.authorRole ?? null,
+          journal: p.journal ?? null,
+          impactFactor: p.impactFactor ?? null,
+          citationCount: p.citationCount ?? null,
+          esiHighlyCited: p.esiHighlyCited ?? null,
+        })),
+      };
+
+      const jobId = await startHaiyouScoreJob(c.env, req);
+      c.executionCtx.waitUntil(runHaiyouScoreJob(c.env, jobId, req));
+      return c.json({ jobId, status: "pending" }, 202);
+    }
+  );
+
+  app.get(
+    "/v1/scholars/:id/haiyou-score",
+    async (c: Context<{ Bindings: Env }>) => {
+      const id = c.req.param("id");
+      if (!id) return c.json({ error: "missing_id" }, 400);
+      const latest = await getLatestHaiyouScore(c.env.DB, id);
+      if (!latest) return c.json({ error: "not_found" }, 404);
+      return new Response(latest.reportJson, {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "x-created-at": String(latest.createdAt),
+        },
+      });
+    }
+  );
 
   return app;
 }

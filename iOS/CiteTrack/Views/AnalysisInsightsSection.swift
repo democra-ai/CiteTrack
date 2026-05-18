@@ -36,6 +36,21 @@ struct AnalysisInsightsSection: View {
                     enrichedCount: analysis.enrichedPapersCount,
                     totalCount: analysis.citingPapersCount
                 )
+                NavigationLink {
+                    HaiyouScoreView(scholarId: scholar.id, scholarName: scholar.name)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(.green)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(lm.localized("haiyou_entry_title", fallback: "海优模拟评分"))
+                                .font(.subheadline).fontWeight(.semibold)
+                            Text(lm.localized("haiyou_entry_subtitle", fallback: "按海优五维评审体系给你的影响力打分"))
+                                .font(.caption2).foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
             } else if isRunning {
                 progressRow
             } else {

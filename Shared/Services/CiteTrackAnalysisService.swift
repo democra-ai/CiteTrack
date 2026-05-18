@@ -185,6 +185,86 @@ public final class CiteTrackAnalysisService {
         return result
     }
 
+    // MARK: - 海优 scoring
+
+    /// Submit a 海优 simulated-scoring job. Requires an analysis to already exist
+    /// for the scholar (run `runAnalysis` first).
+    public func startHaiyouScore(
+        scholarId: String,
+        scholarName: String?,
+        cvText: String?,
+        returnPlanText: String?,
+        representativePapers: [RepresentativePaperInput]
+    ) async throws -> String {
+        struct Body: Encodable {
+            let scholarName: String?
+            let cvText: String?
+            let returnPlanText: String?
+            let representativePapers: [RepresentativePaperInput]
+        }
+        var req = try makeRequest(
+            path: "/v1/scholars/\(scholarId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? scholarId)/haiyou-score",
+            method: "POST"
+        )
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(
+            Body(
+                scholarName: scholarName,
+                cvText: cvText?.isEmpty == true ? nil : cvText,
+                returnPlanText: returnPlanText?.isEmpty == true ? nil : returnPlanText,
+                representativePapers: representativePapers
+            )
+        )
+        let (data, response) = try await session.data(for: req)
+        try Self.check(response, data: data)
+        do {
+            return try JSONDecoder().decode(AnalysisJobResponse.self, from: data).jobId
+        } catch {
+            throw AnalysisServiceError.decode(String(describing: error))
+        }
+    }
+
+    public func fetchLatestHaiyouScore(scholarId: String) async throws -> HaiyouScoreReport? {
+        let req = try makeRequest(
+            path: "/v1/scholars/\(scholarId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? scholarId)/haiyou-score",
+            method: "GET"
+        )
+        let (data, response) = try await session.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode == 404 { return nil }
+        try Self.check(response, data: data)
+        do {
+            return try JSONDecoder().decode(HaiyouScoreReport.self, from: data)
+        } catch {
+            throw AnalysisServiceError.decode(String(describing: error))
+        }
+    }
+
+    /// Convenience: start + poll + fetch the 海优 score report.
+    public func runHaiyouScore(
+        scholarId: String,
+        scholarName: String?,
+        cvText: String?,
+        returnPlanText: String?,
+        representativePapers: [RepresentativePaperInput],
+        progress: ((AnalysisJobStatus) -> Void)? = nil
+    ) async throws -> HaiyouScoreReport {
+        let jobId = try await startHaiyouScore(
+            scholarId: scholarId,
+            scholarName: scholarName,
+            cvText: cvText,
+            returnPlanText: returnPlanText,
+            representativePapers: representativePapers
+        )
+        let final = try await pollUntilDone(jobId: jobId, progress: progress)
+        if final.status == "error" {
+            throw AnalysisServiceError.http(0, final.error ?? "scoring failed")
+        }
+        guard let report = try await fetchLatestHaiyouScore(scholarId: scholarId) else {
+            throw AnalysisServiceError.http(404, "no score report after done")
+        }
+        return report
+    }
+
     // MARK: - Internal
 
     private func makeRequest(path: String, method: String) throws -> URLRequest {
