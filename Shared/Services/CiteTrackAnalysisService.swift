@@ -139,7 +139,7 @@ public final class CiteTrackAnalysisService {
         while Date().timeIntervalSince(start) < maxWait {
             let status = try await fetchJobStatus(jobId: jobId)
             progress?(status)
-            if status.status == "done" || status.status == "error" {
+            if status.status == "done" || status.status == "error" || status.status == "cancelled" {
                 return status
             }
             try await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
@@ -183,6 +183,25 @@ public final class CiteTrackAnalysisService {
             throw AnalysisServiceError.http(404, "no result for scholar after done")
         }
         return result
+    }
+
+    // MARK: - Delete & Cancel
+
+    /// Delete all analysis + score data for a scholar on the backend.
+    public func deleteAnalysis(scholarId: String) async throws {
+        let req = try makeRequest(
+            path: "/v1/scholars/\(scholarId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? scholarId)/analysis",
+            method: "DELETE"
+        )
+        let (data, response) = try await session.data(for: req)
+        try Self.check(response, data: data)
+    }
+
+    /// Cancel a running/pending analysis job.
+    public func cancelJob(jobId: String) async throws {
+        let req = try makeRequest(path: "/v1/jobs/\(jobId)/cancel", method: "POST")
+        let (data, response) = try await session.data(for: req)
+        try Self.check(response, data: data)
     }
 
     // MARK: - 海优 scoring

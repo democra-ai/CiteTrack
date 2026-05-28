@@ -64,7 +64,7 @@ export interface AnalyzeRequest {
   enrichedCitingPapers?: EnrichedCitingPaperInput[];
 }
 
-export type JobStatus = "pending" | "running" | "done" | "error";
+export type JobStatus = "pending" | "running" | "done" | "error" | "cancelled";
 
 export interface JobRecord {
   id: string;

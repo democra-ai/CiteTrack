@@ -11,6 +11,7 @@ import {
   createJob,
   getLatestAnalysisResult,
   insertCitingPapers,
+  isJobCancelled,
   saveHaiyouScore,
   updateJob,
   upsertPublications,
@@ -22,6 +23,7 @@ import { makeRankTopCitedTool } from "./tools/rank_top_cited";
 import { makeExtractInstitutionsTool } from "./tools/extract_institutions";
 import { makeFindNotableScholarsTool } from "./tools/find_notable_scholars";
 import { runHaiyouScoring } from "./scoring/haiyou";
+import { TrackedAi } from "../lib/usage";
 
 export async function startAnalysisJob(
   env: Env,
@@ -77,7 +79,8 @@ export async function runHaiyouScoreJob(
       currentStep: "scoring 5 dimensions",
     });
 
-    const report = await runHaiyouScoring(env.AI, { ...req, analysis });
+    const tracked = new TrackedAi(env.AI);
+    const report = await runHaiyouScoring(tracked.asAi(), { ...req, analysis });
 
     await saveHaiyouScore(
       env.DB,
@@ -94,6 +97,7 @@ export async function runHaiyouScoreJob(
       completed: true,
       resultJson: JSON.stringify({
         report,
+        usage: tracked.summary(),
         totalMs: Date.now() - tStart,
       }),
     });
@@ -149,7 +153,14 @@ export async function runAnalysisJob(env: Env, jobId: string, req: AnalyzeReques
     await updateJob(env.DB, jobId, { currentStep: step, progress: pct });
   };
 
+  // Throws to abort the pipeline early if the user cancelled the job.
+  class CancelledError extends Error {}
+  const checkCancel = async () => {
+    if (await isJobCancelled(env.DB, jobId)) throw new CancelledError();
+  };
+
   try {
+    await checkCancel();
     await updateJob(env.DB, jobId, { status: "running", started: true, progress: 5, currentStep: "enriching" });
 
     const enrichSummary = await runEnrichment(
@@ -163,10 +174,12 @@ export async function runAnalysisJob(env: Env, jobId: string, req: AnalyzeReques
       }
     );
 
+    await checkCancel();
     await setStep("clustering topics", 65);
+    const tracked = new TrackedAi(env.AI);
     const clusterTool = makeClusterTopicsTool(
       env.DB,
-      env.AI,
+      tracked.asAi(),
       req.scholarId,
       req.scholarName,
       req.scholarAffiliation ?? null
@@ -212,14 +225,24 @@ export async function runAnalysisJob(env: Env, jobId: string, req: AnalyzeReques
       notableCiters,
     };
 
+    await checkCancel(); // don't clobber a cancel that landed during the last step
     await updateJob(env.DB, jobId, {
       status: "done",
       progress: 100,
       currentStep: "done",
       completed: true,
-      resultJson: JSON.stringify({ result, trace, totalMs: Date.now() - tStart }),
+      resultJson: JSON.stringify({
+        result,
+        trace,
+        usage: tracked.summary(),
+        totalMs: Date.now() - tStart,
+      }),
     });
   } catch (e) {
+    if (e instanceof CancelledError) {
+      // Cancel endpoint already set status='cancelled'; leave it.
+      return;
+    }
     const msg = e instanceof Error ? e.message : String(e);
     await updateJob(env.DB, jobId, {
       status: "error",

@@ -19,6 +19,9 @@ struct AnalysisInsightsSection: View {
     /// Informational (non-fatal) message when a poll timed out but the job may
     /// still be running server-side.
     @State private var pendingNotice: String?
+    @State private var showDeleteConfirm = false
+    @State private var runStartedAt: Date?
+    @State private var elapsedSeconds = 0
 
     private let lm = LocalizationManager.shared
 
@@ -77,7 +80,7 @@ struct AnalysisInsightsSection: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(lm.localized("analysis_title", fallback: "Citation Analysis"))
                     .font(.headline)
@@ -91,41 +94,86 @@ struct AnalysisInsightsSection: View {
                 .foregroundColor(.secondary)
             }
             Spacer()
-            Button(action: { Task { await run() } }) {
-                if isRunning {
-                    ProgressView()
-                } else if analysis == nil {
-                    Label(
-                        lm.localized("analysis_run", fallback: "Run analysis"),
-                        systemImage: "sparkles"
-                    )
-                    .font(.subheadline)
-                } else {
-                    Label(
-                        lm.localized("analysis_refresh", fallback: "Refresh"),
-                        systemImage: "arrow.clockwise"
-                    )
-                    .font(.subheadline)
+            if isRunning {
+                Button(role: .destructive) {
+                    Task { await stop() }
+                } label: {
+                    Label(lm.localized("analysis_stop", fallback: "Stop"), systemImage: "stop.circle")
+                        .font(.subheadline)
                 }
+                .buttonStyle(.borderless)
+                .tint(.red)
+            } else if analysis != nil {
+                HStack(spacing: 14) {
+                    Button { Task { await run() } } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .disabled(citingPapers.isEmpty)
+                    Button(role: .destructive) { showDeleteConfirm = true } label: {
+                        Image(systemName: "trash")
+                    }
+                    .tint(.red)
+                }
+                .buttonStyle(.borderless)
+                .font(.subheadline)
+            } else {
+                Button { Task { await run() } } label: {
+                    Label(lm.localized("analysis_run", fallback: "Run analysis"), systemImage: "sparkles")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.borderless)
+                .disabled(citingPapers.isEmpty)
             }
-            .buttonStyle(.borderless)
-            .disabled(isRunning || citingPapers.isEmpty)
         }
         .padding(.vertical, 4)
+        .confirmationDialog(
+            lm.localized("analysis_delete_confirm", fallback: "Delete this analysis and 海优 score?"),
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(lm.localized("analysis_delete", fallback: "Delete"), role: .destructive) {
+                Task { await deleteAnalysis() }
+            }
+            Button(lm.localized("cancel", fallback: "Cancel"), role: .cancel) {}
+        }
     }
 
     private var progressRow: some View {
-        HStack(spacing: 12) {
-            ProgressView(value: Double(jobStatus?.progress ?? 0), total: 100)
-                .frame(width: 80)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(enrichProgressText ?? jobStatus?.currentStep ?? lm.localized("analysis_starting", fallback: "Starting…"))
-                    .font(.caption)
-                if let p = jobStatus?.progress {
-                    Text("\(p)%").font(.caption2).foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                ProgressView(value: Double(jobStatus?.progress ?? 0), total: 100)
+                    .frame(width: 90)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stepLabel(enrichProgressText ?? jobStatus?.currentStep))
+                        .font(.caption)
+                    HStack(spacing: 6) {
+                        if let p = jobStatus?.progress {
+                            Text("\(p)%").font(.caption2).foregroundColor(.secondary)
+                        }
+                        if elapsedSeconds > 0 {
+                            Text("· \(elapsedSeconds)s").font(.caption2).foregroundColor(.secondary)
+                        }
+                    }
                 }
+                Spacer()
             }
-            Spacer()
+            Text(lm.localized("analysis_cost_hint", fallback: "≈ $0.002 per run · ~24 free runs/day"))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    /// Human-friendly step labels (the backend emits terse internal steps).
+    private func stepLabel(_ raw: String?) -> String {
+        guard let raw, !raw.isEmpty else { return lm.localized("analysis_starting", fallback: "Starting…") }
+        if raw.hasPrefix("OpenAlex") { return lm.localized("analysis_step_enrich", fallback: "Enriching via OpenAlex…") }
+        switch raw {
+        case "enriching": return lm.localized("analysis_step_enrich", fallback: "Enriching via OpenAlex…")
+        case "clustering topics": return lm.localized("analysis_step_cluster", fallback: "Clustering research directions…")
+        case "ranking top-cited papers": return lm.localized("analysis_step_rank", fallback: "Ranking top-cited papers…")
+        case "aggregating institutions": return lm.localized("analysis_step_inst", fallback: "Aggregating institutions…")
+        case "finding notable citers": return lm.localized("analysis_step_notable", fallback: "Finding notable citers…")
+        default: return raw
         }
     }
 
@@ -203,6 +251,8 @@ struct AnalysisInsightsSection: View {
         isRunning = true
         loadError = nil
         pendingNotice = nil
+        runStartedAt = Date()
+        elapsedSeconds = 0
         enrichProgressText = lm.localized("analysis_enrich_running", fallback: "Looking up OpenAlex…")
         defer {
             isRunning = false
@@ -216,6 +266,7 @@ struct AnalysisInsightsSection: View {
                 Task { @MainActor in
                     let fmt = self.lm.localized("analysis_enrich_progress", fallback: "OpenAlex %d / %d")
                     self.enrichProgressText = String(format: fmt, completed, total)
+                    self.bumpElapsed()
                 }
             }
         )
@@ -241,9 +292,17 @@ struct AnalysisInsightsSection: View {
             let final = try await CiteTrackAnalysisService.shared.pollUntilDone(
                 jobId: jobId,
                 progress: { status in
-                    Task { @MainActor in self.jobStatus = status }
+                    Task { @MainActor in
+                        self.jobStatus = status
+                        self.bumpElapsed()
+                    }
                 }
             )
+            if final.status == "cancelled" {
+                pendingNotice = lm.localized("analysis_cancelled", fallback: "Analysis cancelled.")
+                pendingJobId = nil
+                return
+            }
             if final.status == "error" {
                 loadError = final.error ?? lm.localized("analysis_failed", fallback: "Analysis failed")
                 return
@@ -259,6 +318,41 @@ struct AnalysisInsightsSection: View {
                 "analysis_still_running",
                 fallback: "Analysis is taking longer than expected. The worker may still be running — tap Check result to fetch the latest."
             )
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    private func bumpElapsed() {
+        guard let start = runStartedAt else { return }
+        elapsedSeconds = Int(Date().timeIntervalSince(start))
+    }
+
+    @MainActor
+    private func stop() async {
+        guard let jobId = pendingJobId else {
+            isRunning = false
+            return
+        }
+        do {
+            try await CiteTrackAnalysisService.shared.cancelJob(jobId: jobId)
+        } catch {
+            // best-effort; the poll loop will also stop on cancelled status
+        }
+        isRunning = false
+        pendingNotice = lm.localized("analysis_cancelled", fallback: "Analysis cancelled.")
+        pendingJobId = nil
+    }
+
+    @MainActor
+    private func deleteAnalysis() async {
+        loadError = nil
+        do {
+            try await CiteTrackAnalysisService.shared.deleteAnalysis(scholarId: scholar.id)
+            analysis = nil
+            jobStatus = nil
+            pendingJobId = nil
+            pendingNotice = nil
         } catch {
             loadError = error.localizedDescription
         }
@@ -551,6 +645,8 @@ private func sectionTitle(_ text: String, icon: String, count: Int) -> some View
 }
 
 /// Minimal flow layout for keyword chips (iOS 16+).
+/// Wraps chips onto multiple rows and reports the correct total height, so it
+/// never overflows into the view below. Built on the iOS 16 Layout protocol.
 private struct FlowLayout<Item: Hashable, Content: View>: View {
     let items: [Item]
     let content: (Item) -> Content
@@ -561,41 +657,56 @@ private struct FlowLayout<Item: Hashable, Content: View>: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            self.generateContent(in: geo)
-        }
-        .frame(minHeight: 22)
-    }
-
-    private func generateContent(in geo: GeometryProxy) -> some View {
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-        return ZStack(alignment: .topLeading) {
+        FlowStack(spacing: 4, lineSpacing: 4) {
             ForEach(items, id: \.self) { item in
                 content(item)
-                    .padding(.trailing, 4)
-                    .padding(.bottom, 4)
-                    .alignmentGuide(.leading) { d in
-                        if abs(width - d.width) > geo.size.width {
-                            width = 0
-                            height -= d.height
-                        }
-                        let result = width
-                        if item == items.last {
-                            width = 0
-                        } else {
-                            width -= d.width
-                        }
-                        return result
-                    }
-                    .alignmentGuide(.top) { _ in
-                        let result = height
-                        if item == items.last {
-                            height = 0
-                        }
-                        return result
-                    }
             }
+        }
+    }
+}
+
+private struct FlowStack: Layout {
+    var spacing: CGFloat = 4
+    var lineSpacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var rowWidth: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if rowWidth > 0, rowWidth + spacing + size.width > maxWidth {
+                totalHeight += rowHeight + lineSpacing
+                totalWidth = max(totalWidth, rowWidth)
+                rowWidth = size.width
+                rowHeight = size.height
+            } else {
+                rowWidth += (rowWidth > 0 ? spacing : 0) + size.width
+                rowHeight = max(rowHeight, size.height)
+            }
+        }
+        totalHeight += rowHeight
+        totalWidth = max(totalWidth, rowWidth)
+        return CGSize(width: min(totalWidth, maxWidth), height: totalHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+        let maxWidth = bounds.width
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width - bounds.minX > maxWidth {
+                x = bounds.minX
+                y += rowHeight + lineSpacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
         }
     }
 }

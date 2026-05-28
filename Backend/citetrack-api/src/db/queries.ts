@@ -479,6 +479,39 @@ export async function saveHaiyouScore(
     .run();
 }
 
+/** Wipe everything for a scholar: citing papers, links, clusters, jobs, scores. */
+export async function deleteScholarAnalysis(db: D1Database, scholarId: string): Promise<void> {
+  await db.batch([
+    db.prepare(`DELETE FROM paper_authors WHERE scholar_id = ?`).bind(scholarId),
+    db.prepare(`DELETE FROM citing_papers WHERE scholar_id = ?`).bind(scholarId),
+    db.prepare(`DELETE FROM topic_clusters WHERE scholar_id = ?`).bind(scholarId),
+    db.prepare(`DELETE FROM publications WHERE scholar_id = ?`).bind(scholarId),
+    db.prepare(`DELETE FROM haiyou_scores WHERE scholar_id = ?`).bind(scholarId),
+    db.prepare(`DELETE FROM analysis_jobs WHERE scholar_id = ?`).bind(scholarId),
+  ]);
+}
+
+/** Mark a job cancelled so the running orchestrator can bail at the next checkpoint. */
+export async function cancelJob(db: D1Database, jobId: string): Promise<boolean> {
+  const r = await db
+    .prepare(
+      `UPDATE analysis_jobs SET status='cancelled', current_step='cancelled', completed_at=?
+       WHERE id = ? AND status IN ('pending','running')`
+    )
+    .bind(Date.now(), jobId)
+    .run();
+  return Number(r.meta?.changes ?? 0) > 0;
+}
+
+/** Cheap check used between pipeline steps to honour a cancel request. */
+export async function isJobCancelled(db: D1Database, jobId: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT status FROM analysis_jobs WHERE id = ?`)
+    .bind(jobId)
+    .first<{ status: string }>();
+  return row?.status === "cancelled";
+}
+
 export async function getLatestHaiyouScore(
   db: D1Database,
   scholarId: string

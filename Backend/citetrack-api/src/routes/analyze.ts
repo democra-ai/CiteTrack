@@ -8,7 +8,13 @@ import {
   startAnalysisJob,
   startHaiyouScoreJob,
 } from "../agent/orchestrator";
-import { getJob, getLatestHaiyouScore, getLatestJobResult } from "../db/queries";
+import {
+  cancelJob,
+  deleteScholarAnalysis,
+  getJob,
+  getLatestHaiyouScore,
+  getLatestJobResult,
+} from "../db/queries";
 
 const citingPaperSchema = z.object({
   id: z.string().min(1).max(128),
@@ -149,6 +155,22 @@ export function makeAnalyzeRouter() {
       status: 200,
       headers: { "content-type": "application/json", "x-completed-at": String(latest.completedAt) },
     });
+  });
+
+  // Delete all analysis + score data for a scholar.
+  app.delete("/v1/scholars/:id/analysis", async (c: Context<{ Bindings: Env }>) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "missing_id" }, 400);
+    await deleteScholarAnalysis(c.env.DB, id);
+    return c.json({ ok: true, deleted: id });
+  });
+
+  // Cancel a running/pending job.
+  app.post("/v1/jobs/:id/cancel", async (c: Context<{ Bindings: Env }>) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "missing_id" }, 400);
+    const cancelled = await cancelJob(c.env.DB, id);
+    return c.json({ ok: true, cancelled });
   });
 
   // ---- 海优 simulated scoring ----
