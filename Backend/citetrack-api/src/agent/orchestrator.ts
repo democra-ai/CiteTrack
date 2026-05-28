@@ -42,6 +42,14 @@ export async function startHaiyouScoreJob(
   env: Env,
   req: HaiyouScoreRequest
 ): Promise<string> {
+  // Ensure the scholar row exists — haiyou_scores has an FK to scholars(id).
+  // The user may open 海优 scoring for a scholar that hasn't been analyzed yet
+  // (or whose row was cleared), so upsert defensively before any score insert.
+  await upsertScholar(env.DB, {
+    id: req.scholarId,
+    name: req.scholarName ?? req.scholarId,
+    affiliation: null,
+  });
   return createJob(env.DB, req.scholarId, 0, "haiyou");
 }
 

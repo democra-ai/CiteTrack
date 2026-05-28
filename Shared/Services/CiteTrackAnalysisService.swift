@@ -132,7 +132,7 @@ public final class CiteTrackAnalysisService {
     public func pollUntilDone(
         jobId: String,
         pollInterval: TimeInterval = 3,
-        maxWait: TimeInterval = 180,
+        maxWait: TimeInterval = 300,
         progress: ((AnalysisJobStatus) -> Void)? = nil
     ) async throws -> AnalysisJobStatus {
         let start = Date()

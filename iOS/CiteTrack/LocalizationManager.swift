@@ -260,6 +260,11 @@ public class LocalizationManager: ObservableObject {
         en["analysis_enrichment_unavailable"] = en["analysis_enrichment_unavailable"] ?? "Enrichment data unavailable yet. Institutions and notable scholars appear once papers are matched to OpenAlex."
         en["analysis_enrich_running"] = en["analysis_enrich_running"] ?? "Looking up OpenAlex…"
         en["analysis_enrich_progress"] = en["analysis_enrich_progress"] ?? "OpenAlex %d / %d"
+        en["analysis_check_result"] = en["analysis_check_result"] ?? "Check result"
+        en["analysis_failed"] = en["analysis_failed"] ?? "Analysis failed"
+        en["analysis_still_running"] = en["analysis_still_running"] ?? "Analysis is taking longer than expected. The worker may still be running — tap Check result to fetch the latest."
+        en["analysis_still_running_progress"] = en["analysis_still_running_progress"] ?? "Still running (%@, %d%%). Try again in a moment."
+        en["analysis_no_result_yet"] = en["analysis_no_result_yet"] ?? "No result yet — the worker may still be processing. Try again shortly."
         // 海优 simulated scoring
         en["haiyou_entry_title"] = en["haiyou_entry_title"] ?? "Haiyou Mock Review"
         en["haiyou_entry_subtitle"] = en["haiyou_entry_subtitle"] ?? "Score your impact against the Overseas-Young-Scientist 5-dimension rubric"
@@ -361,6 +366,11 @@ public class LocalizationManager: ObservableObject {
         zh["analysis_enrichment_unavailable"] = zh["analysis_enrichment_unavailable"] ?? "暂时无法获取增强数据。当论文与 OpenAlex 匹配后，机构和知名学者将自动出现。"
         zh["analysis_enrich_running"] = zh["analysis_enrich_running"] ?? "正在查询 OpenAlex…"
         zh["analysis_enrich_progress"] = zh["analysis_enrich_progress"] ?? "OpenAlex %d / %d"
+        zh["analysis_check_result"] = zh["analysis_check_result"] ?? "查看结果"
+        zh["analysis_failed"] = zh["analysis_failed"] ?? "分析失败"
+        zh["analysis_still_running"] = zh["analysis_still_running"] ?? "分析耗时较长，后台可能仍在跑。点「查看结果」获取最新进度。"
+        zh["analysis_still_running_progress"] = zh["analysis_still_running_progress"] ?? "仍在执行（%@，%d%%）。稍等片刻再点。"
+        zh["analysis_no_result_yet"] = zh["analysis_no_result_yet"] ?? "暂无结果——后台可能仍在处理，请稍后再试。"
         // 海优 模拟评分
         zh["haiyou_entry_title"] = zh["haiyou_entry_title"] ?? "海优模拟评分"
         zh["haiyou_entry_subtitle"] = zh["haiyou_entry_subtitle"] ?? "按海优五维评审体系给你的影响力打分"

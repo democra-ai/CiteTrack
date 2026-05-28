@@ -13,6 +13,12 @@ struct AnalysisInsightsSection: View {
     @State private var loadError: String?
     @State private var cachedLoaded = false
     @State private var enrichProgressText: String?
+    /// Job id we last started — kept around so the user can "Refresh" if iOS
+    /// gives up polling before the worker is done.
+    @State private var pendingJobId: String?
+    /// Informational (non-fatal) message when a poll timed out but the job may
+    /// still be running server-side.
+    @State private var pendingNotice: String?
 
     private let lm = LocalizationManager.shared
 
@@ -22,6 +28,9 @@ struct AnalysisInsightsSection: View {
             if let err = loadError {
                 Label(err, systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundColor(.orange)
+            }
+            if let notice = pendingNotice {
+                pendingNoticeRow(notice)
             }
             if let analysis {
                 ResearchDirectionsCard(directions: analysis.researchDirections)
@@ -120,6 +129,31 @@ struct AnalysisInsightsSection: View {
         }
     }
 
+    @ViewBuilder
+    private func pendingNoticeRow(_ notice: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "clock.arrow.circlepath")
+                .foregroundColor(.blue)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundColor(.primary)
+                Button {
+                    Task { await refresh() }
+                } label: {
+                    Label(
+                        lm.localized("analysis_check_result", fallback: "Check result"),
+                        systemImage: "arrow.clockwise"
+                    )
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.borderless)
+                .disabled(isRunning)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
     private var emptyRow: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(
@@ -168,6 +202,7 @@ struct AnalysisInsightsSection: View {
         }
         isRunning = true
         loadError = nil
+        pendingNotice = nil
         enrichProgressText = lm.localized("analysis_enrich_running", fallback: "Looking up OpenAlex…")
         defer {
             isRunning = false
@@ -186,17 +221,88 @@ struct AnalysisInsightsSection: View {
         )
         enrichProgressText = nil
 
+        // Step + poll separately so we can recover the jobId on timeout
+        // and offer a Refresh affordance instead of a fatal error.
+        let jobId: String
         do {
-            let result = try await CiteTrackAnalysisService.shared.runAnalysis(
+            jobId = try await CiteTrackAnalysisService.shared.startAnalysis(
                 scholar: scholar,
                 publications: publications,
                 citingPapers: citingPapers,
-                enrichedCitingPapers: enriched.isEmpty ? nil : enriched,
+                enrichedCitingPapers: enriched.isEmpty ? nil : enriched
+            )
+        } catch {
+            loadError = error.localizedDescription
+            return
+        }
+        pendingJobId = jobId
+
+        do {
+            let final = try await CiteTrackAnalysisService.shared.pollUntilDone(
+                jobId: jobId,
                 progress: { status in
                     Task { @MainActor in self.jobStatus = status }
                 }
             )
-            analysis = result
+            if final.status == "error" {
+                loadError = final.error ?? lm.localized("analysis_failed", fallback: "Analysis failed")
+                return
+            }
+            if let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: scholar.id) {
+                analysis = result
+                pendingJobId = nil
+                pendingNotice = nil
+            }
+        } catch AnalysisServiceError.timeout {
+            // Non-fatal: the worker may still be running. Offer Refresh.
+            pendingNotice = lm.localized(
+                "analysis_still_running",
+                fallback: "Analysis is taking longer than expected. The worker may still be running — tap Check result to fetch the latest."
+            )
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func refresh() async {
+        isRunning = true
+        loadError = nil
+        defer { isRunning = false }
+
+        // 1) If we have a pending job, check its current status first.
+        if let jobId = pendingJobId {
+            do {
+                let status = try await CiteTrackAnalysisService.shared.fetchJobStatus(jobId: jobId)
+                jobStatus = status
+                if status.status == "error" {
+                    loadError = status.error ?? lm.localized("analysis_failed", fallback: "Analysis failed")
+                    pendingJobId = nil
+                    pendingNotice = nil
+                    return
+                }
+                if status.status != "done" {
+                    let fmt = lm.localized("analysis_still_running_progress", fallback: "Still running (%@, %d%%). Try again in a moment.")
+                    pendingNotice = String(format: fmt, status.currentStep ?? "...", status.progress)
+                    return
+                }
+            } catch {
+                // fall through to result fetch
+            }
+        }
+
+        // 2) Job is done (or unknown) — fetch latest result.
+        do {
+            if let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: scholar.id) {
+                analysis = result
+                pendingJobId = nil
+                pendingNotice = nil
+            } else {
+                pendingNotice = lm.localized(
+                    "analysis_no_result_yet",
+                    fallback: "No result yet — the worker may still be processing. Try again shortly."
+                )
+            }
         } catch {
             loadError = error.localizedDescription
         }

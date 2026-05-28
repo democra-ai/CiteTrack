@@ -308,6 +308,17 @@ export async function insertTopicCluster(
   return Number(r.meta?.last_row_id ?? 0);
 }
 
+export async function updateTopicClusterLabel(
+  db: D1Database,
+  clusterDbId: number,
+  label: string
+): Promise<void> {
+  await db
+    .prepare(`UPDATE topic_clusters SET label = ? WHERE id = ?`)
+    .bind(label, clusterDbId)
+    .run();
+}
+
 export async function clearTopicClusters(db: D1Database, scholarId: string): Promise<void> {
   await db.prepare(`DELETE FROM topic_clusters WHERE scholar_id = ?`).bind(scholarId).run();
   await db
