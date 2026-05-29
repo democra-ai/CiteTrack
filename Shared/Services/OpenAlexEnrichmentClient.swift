@@ -76,7 +76,10 @@ public final class OpenAlexEnrichmentClient {
     private let mailto = "tao.shen@zju.edu.cn"
     private let session: URLSession
 
-    private let workCacheKey = "OpenAlexEnrichmentCache_works_v1"
+    // v2: works now include primary_location (venue). Bumping the key forces a
+    // refetch so the "top venues" metric populates instead of reusing v1 entries
+    // that were cached before venue was selected.
+    private let workCacheKey = "OpenAlexEnrichmentCache_works_v2"
     private let authorCacheKey = "OpenAlexEnrichmentCache_authors_v1"
     private let workCacheTTL: TimeInterval = 60 * 60 * 24 * 30
     private let authorCacheTTL: TimeInterval = 60 * 60 * 24 * 14

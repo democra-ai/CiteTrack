@@ -314,14 +314,19 @@ struct CitationInsightsView: View {
                 guard let resolved = await OpenAlexEnrichmentClient.shared.resolveOwnAuthorship(
                     title: pub.title, year: pub.year, scholarName: scholarName
                 ) else { continue }
+                // Only trust the OpenAlex match when the scholar actually appears in it.
+                // A match where the scholar isn't found is almost always a wrong-paper
+                // match (similar title) — replacing the author list there would show the
+                // wrong authors. Keep the original list in that case.
+                guard resolved.matchedIndex != nil, !resolved.authorNames.isEmpty else { continue }
                 let refined = CitationContextService.PublicationWithAuthors(
                     id: pub.id,
                     title: pub.title,
                     year: pub.year,
                     citationCount: pub.citationCount,
-                    authors: resolved.authorNames.isEmpty ? pub.authors : resolved.authorNames,
-                    authorListComplete: !resolved.authorNames.isEmpty,
-                    correspondingByOpenAlex: resolved.matchedIndex != nil ? resolved.isCorresponding : nil
+                    authors: resolved.authorNames,
+                    authorListComplete: true,
+                    correspondingByOpenAlex: resolved.isCorresponding
                 )
                 await MainActor.run {
                     if let i = publicationsWithAuthors.firstIndex(where: { $0.id == pub.id }) {

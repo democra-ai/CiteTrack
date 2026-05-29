@@ -161,6 +161,33 @@ class iCloudSyncManager: ObservableObject {
 		}
 	}
 
+	/// 从 CloudKit 拉取最新快照并合并到本地（“向下同步”）。
+	/// This is the missing half of sync: `exportUsingCloudKit` pushed data UP to
+	/// CloudKit, but `importUsingCloudKit` was never called anywhere — so a second
+	/// device (or this device after relaunch) never pulled changes made elsewhere,
+	/// which is exactly the "data not syncing" report. The merge is additive
+	/// (`addScholar` upserts, `saveHistoryIfChanged` dedups), so pulling on
+	/// launch/foreground can never delete local data. Gated only on iCloud
+	/// availability, mirroring `importConfigOnFirstLaunch`.
+	func syncDownFromCloudKit(reason: String = "") {
+		#if targetEnvironment(simulator)
+		return
+		#else
+		guard isiCloudAvailable else {
+			print("ℹ️ [CloudKit SyncDown] iCloud not available, skip")
+			return
+		}
+		importUsingCloudKit { result in
+			switch result {
+			case .success(let info):
+				print("✅ [CloudKit SyncDown\(reason.isEmpty ? "" : ":\(reason)")] merged scholars=\(info.importedScholars) history=\(info.importedHistory)")
+			case .failure(let err):
+				print("ℹ️ [CloudKit SyncDown\(reason.isEmpty ? "" : ":\(reason)")] no remote data/failed: \(err.localizedDescription)")
+			}
+		}
+		#endif
+	}
+
 	/// 立即同步：将本地数据保存到 CloudKit，并刷新状态
 	func performImmediateSync() {
 		DispatchQueue.main.async {

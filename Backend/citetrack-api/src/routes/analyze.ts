@@ -196,6 +196,7 @@ export function makeAnalyzeRouter() {
     cvText: z.string().max(20000).nullable().optional(),
     returnPlanText: z.string().max(20000).nullable().optional(),
     representativePapers: z.array(repPaperSchema).max(20).optional(),
+    lang: z.string().max(8).nullable().optional(),
   });
 
   app.post(
@@ -232,6 +233,7 @@ export function makeAnalyzeRouter() {
           citationCount: p.citationCount ?? null,
           esiHighlyCited: p.esiHighlyCited ?? null,
         })),
+        lang: body.lang ?? null,
       };
 
       const jobId = await startHaiyouScoreJob(c.env, req);

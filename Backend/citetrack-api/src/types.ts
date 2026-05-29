@@ -159,9 +159,10 @@ export interface RepresentativePaperInput {
 export interface HaiyouScoreRequest {
   scholarId: string;
   scholarName?: string | null;
-  cvText?: string | null; // 教育/工作经历自由文本（维度1用）
-  returnPlanText?: string | null; // 回国设想与依托单位支持（维度5用）
-  representativePapers?: RepresentativePaperInput[];
+  cvText?: string | null; // deprecated — kept for back-compat; ignored by scoring
+  returnPlanText?: string | null; // deprecated — kept for back-compat; ignored
+  representativePapers?: RepresentativePaperInput[]; // deprecated — ignored
+  lang?: string | null; // "en" | "zh" — output language for the impact report
 }
 
 export type FundingPrediction = "priority" | "approved" | "rejected";

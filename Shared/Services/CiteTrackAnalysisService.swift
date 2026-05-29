@@ -269,13 +269,15 @@ public final class CiteTrackAnalysisService {
         scholarName: String?,
         cvText: String?,
         returnPlanText: String?,
-        representativePapers: [RepresentativePaperInput]
+        representativePapers: [RepresentativePaperInput],
+        lang: String? = nil
     ) async throws -> String {
         struct Body: Encodable {
             let scholarName: String?
             let cvText: String?
             let returnPlanText: String?
             let representativePapers: [RepresentativePaperInput]
+            let lang: String?
         }
         var req = try makeRequest(
             path: "/v1/scholars/\(scholarId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? scholarId)/haiyou-score",
@@ -287,7 +289,8 @@ public final class CiteTrackAnalysisService {
                 scholarName: scholarName,
                 cvText: cvText?.isEmpty == true ? nil : cvText,
                 returnPlanText: returnPlanText?.isEmpty == true ? nil : returnPlanText,
-                representativePapers: representativePapers
+                representativePapers: representativePapers,
+                lang: lang
             )
         )
         let (data, response) = try await session.data(for: req)
@@ -321,6 +324,7 @@ public final class CiteTrackAnalysisService {
         cvText: String?,
         returnPlanText: String?,
         representativePapers: [RepresentativePaperInput],
+        lang: String? = nil,
         progress: ((AnalysisJobStatus) -> Void)? = nil
     ) async throws -> HaiyouScoreReport {
         let jobId = try await startHaiyouScore(
@@ -328,7 +332,8 @@ public final class CiteTrackAnalysisService {
             scholarName: scholarName,
             cvText: cvText,
             returnPlanText: returnPlanText,
-            representativePapers: representativePapers
+            representativePapers: representativePapers,
+            lang: lang
         )
         let final = try await pollUntilDone(jobId: jobId, progress: progress)
         if final.status == "error" {

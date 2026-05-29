@@ -227,6 +227,9 @@ struct CiteTrackApp: App {
                         NSLog("🧪 [CiteTrackApp] Trigger initial iCloud checks on launch (NSLog)")
                         icloud.checkSyncStatus()
                         icloud.bootstrapContainerIfPossible()
+                        // Pull the latest snapshot from CloudKit and merge it (the
+                        // previously-missing "sync down"). Additive merge, so safe.
+                        icloud.syncDownFromCloudKit(reason: "launch")
                     }
                 }
         }
@@ -234,6 +237,10 @@ struct CiteTrackApp: App {
             if newPhase == .active {
                 AnalyticsService.shared.log(AnalyticsEventName.appForeground)
                 AnalyticsService.shared.processWidgetEvents()
+                // 前台激活：从 CloudKit 拉取其他设备/会话的最新数据并合并（向下同步）。
+                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.8) {
+                    iCloudSyncManager.shared.syncDownFromCloudKit(reason: "foreground")
+                }
                 // 应用激活时尝试安排下一次刷新
                 CiteTrackApp.scheduleAppRefresh()
                 // 前台激活时，立即同步全局 LastRefreshTime
@@ -244,6 +251,10 @@ struct CiteTrackApp: App {
                 print("🧪 [CiteTrackApp] \(String(format: "debug_sync_last_refresh_time".localized, old?.description ?? "nil", t?.description ?? "nil"))")
             } else if newPhase == .background {
                 AnalyticsService.shared.log(AnalyticsEventName.appBackground)
+                // Push the latest local snapshot UP to CloudKit when leaving, so
+                // edits made this session (add/edit/delete) propagate to other
+                // devices' next sync-down.
+                iCloudSyncManager.shared.performImmediateSync()
             }
         }
     }
@@ -3385,7 +3396,7 @@ struct ScholarChartDetailView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: GlassMetrics.cardSpacing) {
                     // 学者头部信息
                     scholarHeaderView
                     
@@ -3404,7 +3415,7 @@ struct ScholarChartDetailView: View {
                     // 统计信息
                     statisticsView
                 }
-                .padding()
+                .padding(GlassMetrics.screenPadding)
                 // The page scrolls vertically; range switching is via the segmented
                 // Picker. (A previous outer swipe-gesture here intercepted vertical
                 // drags and blocked the ScrollView.)
@@ -3756,10 +3767,10 @@ struct ScholarChartDetailView: View {
                 }
             }
         }
-        .padding()
-        .glassSurface(cornerRadius: 20)
+        // No outer glass: each StatisticsCard is already a glass card, so an outer
+        // surface here would nest cards and read as cluttered.
     }
-    
+
     private func calculatePeriodChange(periodDays: Int) -> (change: Int, growth: Double) {
         guard !chartData.isEmpty else { return (0, 0) }
         

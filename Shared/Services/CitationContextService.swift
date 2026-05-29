@@ -380,9 +380,6 @@ public class CitationContextService: ObservableObject {
             guard !authors.isEmpty else { return .unknown }
             guard !scholarName.isEmpty else { return .unknown }
 
-            // Authoritative signal from OpenAlex wins outright.
-            if correspondingByOpenAlex == true { return .correspondingAuthor }
-
             let count = authors.count
 
             // Parse markers from all authors
@@ -404,9 +401,14 @@ public class CitationContextService: ObservableObject {
             let isFirst = (idx == 0)
             let isLast = (idx == count - 1) && count > 1
 
-            // First author is reliable even on a truncated list — truncation drops
-            // trailing authors, never the lead.
+            // First author ALWAYS wins. A first author who is also the corresponding
+            // author is still labeled 一作 (first), not 通讯. This must be checked
+            // before the OpenAlex is_corresponding signal, which is true for many
+            // first authors and previously mislabeled them corresponding.
             if isFirst { return .firstAuthor }
+
+            // Authoritative corresponding signal from OpenAlex (non-first authors only).
+            if correspondingByOpenAlex == true { return .correspondingAuthor }
 
             if hasAnyMarkers {
                 // A marker on the last author is an explicit corresponding signal,

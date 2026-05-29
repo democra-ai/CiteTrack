@@ -229,6 +229,7 @@ struct HaiyouScoreView: View {
                 cvText: nil,
                 returnPlanText: nil,
                 representativePapers: [],
+                lang: lm.currentLanguage == .chinese ? "zh" : "en",
                 progress: { status in
                     Task { @MainActor in self.jobStatus = status }
                 }

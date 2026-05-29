@@ -103,7 +103,8 @@ interface LabeledCluster {
 async function deduplicateLabels(
   ai: Ai,
   items: LabeledCluster[],
-  scholarName: string
+  scholarName: string,
+  lang: string = "en"
 ): Promise<string[]> {
   const list = items
     .map((it, i) => {
@@ -117,23 +118,43 @@ async function deduplicateLabels(
     })
     .join("\n\n");
 
-  const prompt = `下面是 ${items.length} 个研究方向聚类，来自引用学者"${scholarName}"工作的论文集合。其中多个聚类被独立标注成了几乎相同的标签（例如多个"Federated Graph Learning"）。请你结合每个聚类的关键词和示例标题，**重写这 ${items.length} 个标签**，使得：
+  const isZh = lang === "zh";
+  // The prompt language must match the requested output language — a Chinese
+  // prompt biases the model to emit Chinese labels even when English was asked for.
+  const prompt = isZh
+    ? `下面是 ${items.length} 个研究方向聚类，来自引用学者"${scholarName}"工作的论文集合。其中多个聚类被独立标注成了几乎相同的标签（例如多个"Federated Graph Learning"）。请你结合每个聚类的关键词和示例标题，**重写这 ${items.length} 个标签**，使得：
 - 所有标签**互不相同**
 - 每个标签精准抓住该聚类相对其他聚类的**独特切入点**（方法 / 应用领域 / 数据形态 / 安全维度 / 系统层级等差异）
-- 保持简洁（2-6 个词，与原始标签语言一致：中文或英文）
+- 保持简洁（2-6 个词），并且**全部使用简体中文**
 
 聚类详情：
 ${list}
 
 严格输出 JSON，不要任何额外文字或 markdown：
 {"labels": ["<label1>", "<label2>", ..., "<label${items.length}>"]}
-数组长度必须正好为 ${items.length}，按聚类顺序对应。`;
+数组长度必须正好为 ${items.length}，按聚类顺序对应。`
+    : `Below are ${items.length} research-direction clusters from papers citing the work of "${scholarName}". Several were independently labeled almost identically (e.g. multiple "Federated Graph Learning"). Using each cluster's keywords and example titles, REWRITE all ${items.length} labels so that:
+- all labels are mutually distinct
+- each label captures that cluster's unique angle versus the others (method / application domain / data modality / security aspect / system layer, etc.)
+- each stays concise (2-6 words) and is written in English
+
+Clusters:
+${list}
+
+Output strictly as JSON, no extra text or markdown:
+{"labels": ["<label1>", "<label2>", ..., "<label${items.length}>"]}
+The array length must be exactly ${items.length}, in cluster order.`;
 
   try {
     const resp = await withTimeout(
       ai.run(LABEL_MODEL, {
         messages: [
-          { role: "system", content: "你只输出合法紧凑 JSON，不输出多余文字或 markdown。" },
+          {
+            role: "system",
+            content: isZh
+              ? "你只输出合法紧凑 JSON，不输出多余文字或 markdown。"
+              : "You output only valid compact JSON. No prose, no markdown fences.",
+          },
           { role: "user", content: prompt },
         ],
         max_tokens: 280,
@@ -303,7 +324,7 @@ export function makeClusterTopicsTool(
       const labels = labeled.map((x) => x.direction.label.trim().toLowerCase());
       const hasDupes = new Set(labels).size !== labels.length;
       if (hasDupes && labeled.length >= 2) {
-        const distinct = await deduplicateLabels(ai, labeled, scholarName);
+        const distinct = await deduplicateLabels(ai, labeled, scholarName, lang);
         for (let i = 0; i < labeled.length; i++) {
           const newLabel = distinct[i];
           if (newLabel && newLabel !== labeled[i].direction.label) {

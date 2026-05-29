@@ -48,30 +48,34 @@ struct AnalysisInsightsSection: View {
             // Order (per product): notable citers → top venues → directions →
             // top-cited → institutions, then the impact-score entry.
             if let analysis {
-                GlassCard {
-                    NotableCitersCard(
-                        citers: analysis.notableCiters,
-                        enrichedCount: analysis.enrichedPapersCount,
-                        totalCount: analysis.citingPapersCount
-                    )
+                VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+                    GlassCard {
+                        NotableCitersCard(
+                            citers: analysis.notableCiters,
+                            enrichedCount: analysis.enrichedPapersCount,
+                            totalCount: analysis.citingPapersCount
+                        )
+                    }
+                    GlassCard {
+                        TopVenuesCard(
+                            venues: analysis.topVenues,
+                            enrichedCount: analysis.enrichedPapersCount,
+                            totalCount: analysis.citingPapersCount
+                        )
+                    }
+                    GlassCard { ResearchDirectionsCard(directions: analysis.researchDirections) }
+                    GlassCard { TopCitedPapersCard(papers: analysis.topCitedPapers) }
+                    GlassCard {
+                        CitingInstitutionsCard(
+                            institutions: analysis.citingInstitutions,
+                            enrichedCount: analysis.enrichedPapersCount,
+                            totalCount: analysis.citingPapersCount
+                        )
+                    }
+                    haiyouEntryCard
                 }
-                GlassCard {
-                    TopVenuesCard(
-                        venues: analysis.topVenues,
-                        enrichedCount: analysis.enrichedPapersCount,
-                        totalCount: analysis.citingPapersCount
-                    )
-                }
-                GlassCard { ResearchDirectionsCard(directions: analysis.researchDirections) }
-                GlassCard { TopCitedPapersCard(papers: analysis.topCitedPapers) }
-                GlassCard {
-                    CitingInstitutionsCard(
-                        institutions: analysis.citingInstitutions,
-                        enrichedCount: analysis.enrichedPapersCount,
-                        totalCount: analysis.citingPapersCount
-                    )
-                }
-                haiyouEntryCard
+                // Smooth reveal when results arrive (vs. popping in abruptly).
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
         .task(id: scholar.id) {
@@ -262,7 +266,9 @@ struct AnalysisInsightsSection: View {
         cachedLoaded = true
         do {
             if let cached = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: scholar.id) {
-                analysis = cached
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.9)) {
+                    analysis = cached
+                }
             }
         } catch {
             // silent: cached fetch is best-effort
@@ -341,7 +347,9 @@ struct AnalysisInsightsSection: View {
                 return
             }
             if let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: scholar.id) {
-                analysis = result
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    analysis = result
+                }
                 pendingJobId = nil
                 pendingNotice = nil
             }
@@ -421,7 +429,9 @@ struct AnalysisInsightsSection: View {
         // 2) Job is done (or unknown) — fetch latest result.
         do {
             if let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: scholar.id) {
-                analysis = result
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    analysis = result
+                }
                 pendingJobId = nil
                 pendingNotice = nil
             } else {
