@@ -125,11 +125,20 @@ export interface NotableCiter {
   examplePapers: Array<{ id: string; title: string }>;
 }
 
+export interface VenueCitingPaper {
+  id: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  scholarUrl: string | null;
+}
+
 export interface TopVenue {
   name: string;
   type: string | null; // journal | conference | repository | ...
   paperCount: number;
   totalCitations: number;
+  papers: VenueCitingPaper[]; // the citing papers from this venue (for drill-down)
 }
 
 export interface AnalysisResult {

@@ -47,12 +47,35 @@ public struct AnalysisResult: Codable, Hashable {
     }
 }
 
+public struct VenueCitingPaper: Codable, Hashable, Identifiable {
+    public let id: String
+    public let title: String
+    public let authors: [String]
+    public let year: Int?
+    public let scholarUrl: String?
+}
+
 public struct TopVenue: Codable, Hashable, Identifiable {
     public let name: String
     public let type: String?       // journal | conference | repository | ...
     public let paperCount: Int
     public let totalCitations: Int
+    public let papers: [VenueCitingPaper]
     public var id: String { name }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, type, paperCount, totalCitations, papers
+    }
+
+    // Custom decode so results stored before `papers` existed still load.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        paperCount = try c.decodeIfPresent(Int.self, forKey: .paperCount) ?? 0
+        totalCitations = try c.decodeIfPresent(Int.self, forKey: .totalCitations) ?? 0
+        papers = try c.decodeIfPresent([VenueCitingPaper].self, forKey: .papers) ?? []
+    }
 }
 
 public struct ResearchDirection: Codable, Hashable, Identifiable {

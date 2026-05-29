@@ -691,27 +691,31 @@ private struct TopVenuesCard: View {
                 }
             } else {
                 ForEach(venues.prefix(15)) { v in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("\(v.paperCount)")
-                            .font(.caption.monospacedDigit())
-                            .fontWeight(.semibold)
-                            .foregroundColor(.teal)
-                            .frame(minWidth: 30, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(v.name).font(.subheadline).lineLimit(2)
-                            HStack(spacing: 6) {
+                    NavigationLink {
+                        VenueCitingPapersView(venue: v)
+                    } label: {
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("\(v.paperCount)")
+                                .font(.caption.monospacedDigit())
+                                .fontWeight(.semibold)
+                                .foregroundColor(.teal)
+                                .frame(minWidth: 30, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(v.name).font(.subheadline).foregroundColor(.primary).lineLimit(2)
                                 if let t = v.type, !t.isEmpty {
                                     Text(venueTypeLabel(t))
                                         .font(.caption2).foregroundColor(.secondary)
                                 }
-                                if v.totalCitations > 0 {
-                                    Text(String(format: lm.localized("analysis_citedby_n", fallback: "%d total citations"), v.totalCitations))
-                                        .font(.caption2).foregroundColor(.secondary)
-                                }
                             }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.secondary)
                         }
+                        .padding(.vertical, 3)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 3)
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -726,6 +730,59 @@ private struct TopVenuesCard: View {
         case "book series", "book": return lm.localized("venue_type_book", fallback: "Book series")
         default: return raw.capitalized
         }
+    }
+}
+
+// MARK: - Venue drill-down: which papers in this venue cited the scholar
+
+private struct VenueCitingPapersView: View {
+    let venue: TopVenue
+    private let lm = LocalizationManager.shared
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+                Text(String(format: lm.localized("analysis_venue_cited_n", fallback: "%d papers here cited you"), venue.paperCount))
+                    .font(.caption).foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                ForEach(venue.papers) { p in
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(p.title)
+                                .font(.subheadline).fontWeight(.medium)
+                                .foregroundColor(.primary)
+                            if !p.authors.isEmpty {
+                                Text(p.authors.prefix(6).joined(separator: ", ")
+                                     + (p.authors.count > 6 ? " " + "et_al".localized : ""))
+                                    .font(.caption2).foregroundColor(.secondary).lineLimit(2)
+                            }
+                            HStack(spacing: 12) {
+                                if let y = p.year {
+                                    Text(verbatim: "\(y)").font(.caption2).foregroundColor(.secondary)
+                                }
+                                if let link = venueURL(p.scholarUrl) {
+                                    Link(destination: link) {
+                                        Label(lm.localized("open_in_browser", fallback: "Open"), systemImage: "safari")
+                                            .font(.caption2)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .padding(GlassMetrics.screenPadding)
+        }
+        .liquidGlassCanvas()
+        .navigationTitle(venue.name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func venueURL(_ s: String?) -> URL? {
+        guard let s, s.hasPrefix("http") else { return nil }
+        return URL(string: s)
     }
 }
 

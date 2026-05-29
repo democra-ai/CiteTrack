@@ -259,8 +259,9 @@ public class LocalizationManager: ObservableObject {
         en["analysis_citedby_n"] = en["analysis_citedby_n"] ?? "%d total citations"
         en["analysis_enrichment_unavailable"] = en["analysis_enrichment_unavailable"] ?? "Enrichment data unavailable yet. Institutions and notable scholars appear once papers are matched to OpenAlex."
         // Top venues metric
-        en["analysis_card_venues"] = en["analysis_card_venues"] ?? "Top Venues Citing You"
-        en["analysis_venues_unavailable"] = en["analysis_venues_unavailable"] ?? "Venues appear once citing papers are matched to OpenAlex."
+        en["analysis_card_venues"] = en["analysis_card_venues"] ?? "Notable Venues Citing You"
+        en["analysis_venue_cited_n"] = en["analysis_venue_cited_n"] ?? "%d papers here cited you"
+        en["analysis_venues_unavailable"] = en["analysis_venues_unavailable"] ?? "Notable venues appear once citing papers are matched to OpenAlex (re-run the analysis)."
         en["venue_type_journal"] = en["venue_type_journal"] ?? "Journal"
         en["venue_type_conference"] = en["venue_type_conference"] ?? "Conference"
         en["venue_type_repository"] = en["venue_type_repository"] ?? "Repository"
@@ -492,8 +493,9 @@ public class LocalizationManager: ObservableObject {
         zh["analysis_citedby_n"] = zh["analysis_citedby_n"] ?? "总引用 %d"
         zh["analysis_enrichment_unavailable"] = zh["analysis_enrichment_unavailable"] ?? "暂时无法获取增强数据。当论文与 OpenAlex 匹配后，机构和知名学者将自动出现。"
         // 顶级刊物指标
-        zh["analysis_card_venues"] = zh["analysis_card_venues"] ?? "引用你的顶级刊物"
-        zh["analysis_venues_unavailable"] = zh["analysis_venues_unavailable"] ?? "当引用论文与 OpenAlex 匹配后，刊物/会议将自动出现。"
+        zh["analysis_card_venues"] = zh["analysis_card_venues"] ?? "引用你的知名刊物"
+        zh["analysis_venue_cited_n"] = zh["analysis_venue_cited_n"] ?? "其中 %d 篇文章引用了你"
+        zh["analysis_venues_unavailable"] = zh["analysis_venues_unavailable"] ?? "当引用论文与 OpenAlex 匹配后，知名刊物/会议将自动出现（请重新运行分析）。"
         zh["venue_type_journal"] = zh["venue_type_journal"] ?? "期刊"
         zh["venue_type_conference"] = zh["venue_type_conference"] ?? "会议"
         zh["venue_type_repository"] = zh["venue_type_repository"] ?? "预印本/仓库"
