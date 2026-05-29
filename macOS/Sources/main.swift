@@ -1,5 +1,6 @@
 import Cocoa
 import Foundation
+import Combine
 import ServiceManagement
 #if !APP_STORE
 import Sparkle
@@ -502,6 +503,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var chartsWindowController: NSWindowController?
     private var scholars: [Scholar] = []
     private var currentCitations: [String: Int] = [:]
+    private var authCancellable: AnyCancellable?
     private let backgroundDataService = BackgroundDataCollectionService.shared
     private var isUpdating = false
     /// Thread-safe queue for protecting shared mutable state during citation refresh
@@ -787,6 +789,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        // Google account: sign in / sign out.
+        let accountItem: NSMenuItem
+        if GoogleAuthService.shared.isSignedIn {
+            let who = GoogleAuthService.shared.currentUser?.displayName ?? "Account"
+            accountItem = NSMenuItem(title: "Sign Out (\(who))", action: #selector(signOutGoogle), keyEquivalent: "")
+            if #available(macOS 11.0, *) {
+                accountItem.image = NSImage(systemSymbolName: "person.crop.circle.badge.checkmark", accessibilityDescription: nil)
+            }
+        } else {
+            accountItem = NSMenuItem(title: "Sign In…", action: #selector(showSignIn), keyEquivalent: "")
+            if #available(macOS 11.0, *) {
+                accountItem.image = NSImage(systemSymbolName: "person.crop.circle", accessibilityDescription: nil)
+            }
+        }
+        accountItem.target = self
+        menu.addItem(accountItem)
+
+        // Rebuild the menu when auth state changes so the account item stays current.
+        if authCancellable == nil {
+            authCancellable = GoogleAuthService.shared.$isSignedIn
+                .dropFirst()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.rebuildMenu() }
+        }
+
+        menu.addItem(NSMenuItem.separator())
+
         let aboutItem = NSMenuItem(title: L("menu_about"), action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
         if #available(macOS 11.0, *) {
@@ -801,7 +830,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.addItem(quitItem)
     }
-    
+
+    @objc private func showSignIn() {
+        SignInWindowController.shared.show()
+    }
+
+    @objc private func signOutGoogle() {
+        GoogleAuthService.shared.signOut()
+        rebuildMenu()
+    }
+
     private func loadScholars() {
         scholars = PreferencesManager.shared.scholars
         // 更新当前引用量缓存
