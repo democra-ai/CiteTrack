@@ -32,6 +32,7 @@
 		93F056E40EF552C9ED4CD92C /* OpenAlexEnrichmentClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8D10F9C19ACEE9A1C6F016 /* OpenAlexEnrichmentClient.swift */; };
 		9E5F82A5E13D4A7491A976B9 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 935D94836ED349F7B0E9C40D /* Constants.swift */; };
 		9FCE188050BA6E6B3BA802D4 /* PublicationInfoShim.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA80A91B9284EDEB9D913C79 /* PublicationInfoShim.swift */; };
+		A89B568F0BE8CAF0A803537B /* MacInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4FF06F0FAE06F6171C8ED1D /* MacInsightsView.swift */; };
 		AA2F97A100F18AAE421C3000 /* CitationHistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7218C7442A020FA686FDB564 /* CitationHistoryManager.swift */; };
 		AA5A144AF2205D8A2D7B817F /* ChartsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD84EBC806E3367F23A120D5 /* ChartsViewController.swift */; };
 		AC11BD407130C9A1D5FE0373 /* app_icon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 0C8E41AC27A6DFFF142067A1 /* app_icon.icns */; };
@@ -47,6 +48,7 @@
 		E5382A5D6E344E2EB79B0A0C /* CitationCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 002A29E87D14470BACF2D64C /* CitationCacheService.swift */; };
 		E886B418385CB02D07759C14 /* CitationHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64A1948FEF426329EAA06D07 /* CitationHistory.swift */; };
 		EE8E71B7F70B0FB3273E2A11 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0E9CD073C6469F5298E7572 /* main.swift */; };
+		F12DDF4ED3DBB54561D0553C /* LiquidGlassMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776F326CB6A4120E25E07FAB /* LiquidGlassMac.swift */; };
 		F93941F9D9C3451182C89A15 /* CitingAuthor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A726D21159D428AB39585C5 /* CitingAuthor.swift */; };
 		FF71600E552B25AA853C1747 /* SemanticScholarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24013557AD0B9363FAABA531 /* SemanticScholarService.swift */; };
 		FIREBASE0D2E7600MACBUILD1 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = FIREBASE0E2E7600MACPROD1 /* FirebaseAnalytics */; };
@@ -87,6 +89,7 @@
 		64A3E3930F6F4F0DA4EE11EF /* CitationFetchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CitationFetchService.swift; path = ../../Shared/Services/CitationFetchService.swift; sourceTree = "<group>"; };
 		6B7B97D8DA160C19D653BC62 /* CoreDataManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoreDataManager.swift; sourceTree = "<group>"; };
 		7218C7442A020FA686FDB564 /* CitationHistoryManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CitationHistoryManager.swift; sourceTree = "<group>"; };
+		776F326CB6A4120E25E07FAB /* LiquidGlassMac.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiquidGlassMac.swift; sourceTree = "<group>"; };
 		7911B549389C696AD0AD38CA /* ChartView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChartView.swift; sourceTree = "<group>"; };
 		85D7166C31AF7D8E36118B87 /* GoogleSignInView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoogleSignInView.swift; sourceTree = "<group>"; };
 		8A726D21159D428AB39585C5 /* CitingAuthor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CitingAuthor.swift; path = ../../Shared/Models/CitingAuthor.swift; sourceTree = "<group>"; };
@@ -100,6 +103,7 @@
 		AD84EBC806E3367F23A120D5 /* ChartsViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChartsViewController.swift; sourceTree = "<group>"; };
 		B0007BC3FE9A72AF5E7C0355 /* CitationContext.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CitationContext.swift; path = ../../Shared/Models/CitationContext.swift; sourceTree = "<group>"; };
 		B46969BCF75C4050B90B2387 /* UnifiedCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = UnifiedCacheManager.swift; path = ../../Shared/Services/UnifiedCacheManager.swift; sourceTree = "<group>"; };
+		B4FF06F0FAE06F6171C8ED1D /* MacInsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacInsightsView.swift; sourceTree = "<group>"; };
 		BA80A91B9284EDEB9D913C79 /* PublicationInfoShim.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PublicationInfoShim.swift; sourceTree = "<group>"; };
 		BE2E87D92DE5D70521EF2C7C /* DashboardComponents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardComponents.swift; sourceTree = "<group>"; };
 		C0BF1BA84CFC692DFF8BB622 /* ChartDataService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChartDataService.swift; sourceTree = "<group>"; };
@@ -176,6 +180,8 @@
 				37126DC7A112F46CA0092B67 /* CiteTrackAnalysisService.swift */,
 				B0007BC3FE9A72AF5E7C0355 /* CitationContext.swift */,
 				BA80A91B9284EDEB9D913C79 /* PublicationInfoShim.swift */,
+				776F326CB6A4120E25E07FAB /* LiquidGlassMac.swift */,
+				B4FF06F0FAE06F6171C8ED1D /* MacInsightsView.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -328,6 +334,8 @@
 				3F70BFBA3B12626DA8A7B950 /* CiteTrackAnalysisService.swift in Sources */,
 				6B09CEE79096617DBEE81CBB /* CitationContext.swift in Sources */,
 				9FCE188050BA6E6B3BA802D4 /* PublicationInfoShim.swift in Sources */,
+				F12DDF4ED3DBB54561D0553C /* LiquidGlassMac.swift in Sources */,
+				A89B568F0BE8CAF0A803537B /* MacInsightsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

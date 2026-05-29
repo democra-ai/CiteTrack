@@ -787,6 +787,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.addItem(chartsItem)
 
+        let insightsItem = NSMenuItem(title: "Citation Insights…", action: #selector(showInsights), keyEquivalent: "i")
+        insightsItem.target = self
+        if #available(macOS 11.0, *) {
+            insightsItem.image = NSImage(systemSymbolName: "quote.bubble", accessibilityDescription: nil)
+        }
+        menu.addItem(insightsItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Google account: sign in / sign out.
@@ -833,6 +840,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showSignIn() {
         SignInWindowController.shared.show()
+    }
+
+    @objc private func showInsights() {
+        InsightsWindowController.shared.show()
     }
 
     @objc private func signOutGoogle() {

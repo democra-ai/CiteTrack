@@ -7,7 +7,7 @@ project = Xcodeproj::Project.open(path)
 app_target = project.targets.find { |t| t.product_type == 'com.apple.product-type.application' } || project.targets.first
 sources_group = project.main_group['Sources'] || project.main_group
 
-new_files = ['GoogleAuthService.swift', 'GoogleSignInView.swift']
+new_files = ['GoogleAuthService.swift', 'GoogleSignInView.swift', 'LiquidGlassMac.swift', 'MacInsightsView.swift']
 
 new_files.each do |fname|
   file_ref = project.files.find { |f| f.display_name == fname }
