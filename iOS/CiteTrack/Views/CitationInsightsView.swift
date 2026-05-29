@@ -211,13 +211,13 @@ struct CitationInsightsView: View {
                 selectedPubIds = Set(merged.map { $0.id })
             }
 
-            // If still too many missing, force fresh fetch from GS; otherwise refine
-            // author roles via OpenAlex (authoritative complete author lists).
+            // If still too many missing, force a fresh fetch from GS.
+            // (OpenAlex author-role refinement is temporarily disabled — it caused
+            // app-wide stutter. detectRole's conservative heuristic still fixes the
+            // first-author/corresponding bug with no network work.)
             let withAuthors = merged.filter { !$0.authors.isEmpty }.count
             if withAuthors < merged.count / 2 {
                 fetchFreshAuthorsFromGS(scholarId)
-            } else {
-                refineRolesViaOpenAlex(scholarId: scholarId, scholarName: selectedScholarName)
             }
             return
         }
@@ -234,12 +234,10 @@ struct CitationInsightsView: View {
             hasAuthorInfo = gsPubs.contains { !$0.authors.isEmpty }
             selectedPubIds = Set(mapped.map { $0.id })
 
-            // If many authors missing, force fresh fetch; otherwise refine roles via OpenAlex.
+            // If many authors missing, force a fresh fetch. (OpenAlex refinement disabled.)
             let withAuthors = mapped.filter { !$0.authors.isEmpty }.count
             if withAuthors < mapped.count / 2 {
                 fetchFreshAuthorsFromGS(scholarId)
-            } else {
-                refineRolesViaOpenAlex(scholarId: scholarId, scholarName: selectedScholarName)
             }
             return
         }
@@ -293,8 +291,6 @@ struct CitationInsightsView: View {
 
                 // Save to PubAuthors cache for next session
                 contextService.savePublicationAuthors(mapped, forScholar: scholarId)
-                // Refine GS author lists with authoritative OpenAlex data.
-                refineRolesViaOpenAlex(scholarId: scholarId, scholarName: selectedScholarName)
             }
         }
     }

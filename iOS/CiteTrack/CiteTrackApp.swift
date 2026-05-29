@@ -227,9 +227,9 @@ struct CiteTrackApp: App {
                         NSLog("🧪 [CiteTrackApp] Trigger initial iCloud checks on launch (NSLog)")
                         icloud.checkSyncStatus()
                         icloud.bootstrapContainerIfPossible()
-                        // Pull the latest snapshot from CloudKit and merge it (the
-                        // previously-missing "sync down"). Additive merge, so safe.
-                        icloud.syncDownFromCloudKit(reason: "launch")
+                        // (Auto CloudKit sync-down temporarily disabled — it ran a
+                        // main-thread import that could stall the UI. Reworking
+                        // off-main before re-enabling.)
                     }
                 }
         }
@@ -250,10 +250,6 @@ struct CiteTrackApp: App {
                 print("🧪 [CiteTrackApp] \(String(format: "debug_sync_last_refresh_time".localized, old?.description ?? "nil", t?.description ?? "nil"))")
             } else if newPhase == .background {
                 AnalyticsService.shared.log(AnalyticsEventName.appBackground)
-                // Push the latest local snapshot UP to CloudKit when leaving, so
-                // edits made this session (add/edit/delete) propagate to other
-                // devices' next sync-down.
-                iCloudSyncManager.shared.performImmediateSync()
             }
         }
     }
