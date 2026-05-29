@@ -10,7 +10,7 @@ import {
 } from "../agent/orchestrator";
 import {
   cancelJob,
-  deleteScholarAnalysis,
+  deleteScholarAnalysisDeep,
   getJob,
   getLatestHaiyouScore,
   getLatestJobResult,
@@ -57,7 +57,9 @@ const enrichedCitingPaperSchema = z.object({
 });
 
 const analyzeBody = z.object({
-  scholarId: z.string().min(1).max(128),
+  // Up to 256 chars so per-publication scoped ids ("<scholarId>~pub~<pubId>")
+  // — used to run a separate analysis per selected paper — pass validation.
+  scholarId: z.string().min(1).max(256),
   scholarName: z.string().min(1).max(256),
   scholarAffiliation: z.string().max(512).nullable().optional(),
   publications: z
@@ -163,11 +165,12 @@ export function makeAnalyzeRouter() {
     });
   });
 
-  // Delete all analysis + score data for a scholar.
+  // Delete all analysis + score data for a scholar, including every
+  // per-publication scoped partition ("<id>~pub~<pubId>").
   app.delete("/v1/scholars/:id/analysis", async (c: Context<{ Bindings: Env }>) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "missing_id" }, 400);
-    await deleteScholarAnalysis(c.env.DB, id);
+    await deleteScholarAnalysisDeep(c.env.DB, id);
     return c.json({ ok: true, deleted: id });
   });
 

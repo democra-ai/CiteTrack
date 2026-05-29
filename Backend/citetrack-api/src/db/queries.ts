@@ -491,6 +491,28 @@ export async function deleteScholarAnalysis(db: D1Database, scholarId: string): 
   ]);
 }
 
+/**
+ * Like deleteScholarAnalysis, but also removes every per-publication scoped
+ * partition ("<scholarId>~pub~<pubId>") created by the per-paper analysis flow.
+ * Deleting just the base id would otherwise orphan those rows.
+ */
+export async function deleteScholarAnalysisDeep(db: D1Database, scholarId: string): Promise<void> {
+  const like = `${scholarId}~pub~%`;
+  const tables = [
+    "paper_authors",
+    "citing_papers",
+    "topic_clusters",
+    "publications",
+    "haiyou_scores",
+    "analysis_jobs",
+  ];
+  await db.batch(
+    tables.map((t) =>
+      db.prepare(`DELETE FROM ${t} WHERE scholar_id = ? OR scholar_id LIKE ?`).bind(scholarId, like)
+    )
+  );
+}
+
 /** Mark a job cancelled so the running orchestrator can bail at the next checkpoint. */
 export async function cancelJob(db: D1Database, jobId: string): Promise<boolean> {
   const r = await db

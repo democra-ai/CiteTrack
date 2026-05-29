@@ -147,6 +147,11 @@ struct CitationInsightsView: View {
         return Array(byId.values)
     }
 
+    /// Whether at least one analyzed publication has citing papers to analyze per-paper.
+    private var hasAnalyzablePapers: Bool {
+        publicationResults.contains { $0.fetchStatus == .success && !$0.citingPapers.isEmpty }
+    }
+
     /// IDs of publications considered "done": only successfully fetched ones, or
     /// papers definitively not indexed on Semantic Scholar. Rate-limited and error
     /// results are transient, so they stay OUT of this set and remain retryable —
@@ -392,11 +397,11 @@ struct CitationInsightsView: View {
                 if hasFetched && !contextService.batchProgress.isRunning {
                     GlassCard { summaryCard }
 
-                    if let scholar = currentScholar, !citingPapersForAnalysis.isEmpty {
-                        AnalysisInsightsSection(
+                    if let scholar = currentScholar, hasAnalyzablePapers {
+                        PerPaperAnalysisListCard(
                             scholar: scholar,
-                            publications: publicationsForAnalysis,
-                            citingPapers: citingPapersForAnalysis
+                            pubResults: publicationResults,
+                            publicationsForAnalysis: publicationsForAnalysis
                         )
                     }
 
@@ -1397,6 +1402,123 @@ struct PublicationCitationDetailView: View {
 
     private func detailStatCell(value: String, label: String, icon: String, color: Color) -> some View {
         GlassStatCell(value: value, label: label, systemImage: icon, tint: color)
+    }
+}
+
+// MARK: - Per-paper analysis list
+
+/// Lists each analyzed publication. Tapping one opens a SEPARATE analysis scoped to
+/// just that paper's citing papers (its own research directions, notable citers,
+/// venues, top-cited, institutions) — instead of one aggregate across all papers.
+private struct PerPaperAnalysisListCard: View {
+    let scholar: Scholar
+    let pubResults: [CitationContextService.PublicationCitationResults]
+    let publicationsForAnalysis: [ScholarPublication]
+    private let lm = LocalizationManager.shared
+
+    private var analyzable: [CitationContextService.PublicationCitationResults] {
+        pubResults.filter { $0.fetchStatus == .success && !$0.citingPapers.isEmpty }
+    }
+
+    var body: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(lm.localized("analysis_per_paper_title", fallback: "Per-paper analysis"))
+                        .font(.headline)
+                    Text(lm.localized("analysis_per_paper_subtitle",
+                                      fallback: "Tap a paper to analyze who cites it — directions, notable citers, venues, and more."))
+                        .font(.caption).foregroundColor(.secondary)
+                }
+
+                if analyzable.isEmpty {
+                    Text(lm.localized("analysis_per_paper_empty",
+                                      fallback: "Analyze papers above first; each one can then be analyzed on its own."))
+                        .font(.caption).foregroundColor(.secondary)
+                } else {
+                    ForEach(Array(analyzable.enumerated()), id: \.element.id) { idx, pub in
+                        NavigationLink {
+                            PerPaperAnalysisScreen(
+                                scholar: scholar,
+                                pubResult: pub,
+                                publication: publicationsForAnalysis.first { $0.clusterId == pub.id }
+                            )
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .font(.subheadline).foregroundColor(.accentColor)
+                                    .frame(width: 22)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(pub.publicationTitle)
+                                        .font(.subheadline).fontWeight(.medium)
+                                        .foregroundColor(.primary).lineLimit(2)
+                                    Text(String(format: lm.localized("analysis_n_citing_papers", fallback: "%d citing papers"),
+                                                pub.citingPapers.count))
+                                        .font(.caption2).foregroundColor(.secondary)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                            }
+                            .padding(.vertical, 4)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        if idx < analyzable.count - 1 {
+                            Divider().opacity(0.5)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One paper's isolated analysis screen: wraps AnalysisInsightsSection scoped to a
+/// single publication (auto-runs on open if nothing is cached yet).
+private struct PerPaperAnalysisScreen: View {
+    let scholar: Scholar
+    let pubResult: CitationContextService.PublicationCitationResults
+    let publication: ScholarPublication?
+
+    /// This single paper's citing-paper set (deduped) for the scoped analysis.
+    private var citingPapers: [CitingPaper] {
+        var byId: [String: CitingPaper] = [:]
+        for cp in pubResult.citingPapers {
+            if byId[cp.id] != nil { continue }
+            byId[cp.id] = CitingPaper(
+                id: cp.id,
+                title: cp.citingPaperTitle,
+                authors: cp.citingAuthors,
+                year: cp.citingYear,
+                venue: nil,
+                citationCount: nil,
+                abstract: cp.contexts.isEmpty ? nil : cp.contexts.joined(separator: " "),
+                scholarUrl: nil,
+                pdfUrl: nil,
+                citedScholarId: scholar.id
+            )
+        }
+        return Array(byId.values)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+                AnalysisInsightsSection(
+                    scholar: scholar,
+                    publications: publication.map { [$0] } ?? [],
+                    citingPapers: citingPapers,
+                    publicationId: pubResult.id,
+                    publicationTitle: pubResult.publicationTitle,
+                    autoRun: true
+                )
+            }
+            .padding(GlassMetrics.screenPadding)
+        }
+        .liquidGlassCanvas()
+        .navigationTitle(pubResult.publicationTitle)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

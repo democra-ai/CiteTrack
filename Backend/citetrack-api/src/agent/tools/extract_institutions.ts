@@ -11,10 +11,12 @@ export function makeExtractInstitutionsTool(db: D1Database, scholarId: string) {
         .prepare(
           `SELECT i.id, i.display_name, i.country_code, i.type,
                   COUNT(DISTINCT pa.citing_paper_id) AS paper_count,
-                  COUNT(DISTINCT ai.author_id) AS author_count
+                  COUNT(DISTINCT ai.author_id) AS author_count,
+                  GROUP_CONCAT(DISTINCT a.display_name) AS author_names
            FROM institutions i
            JOIN author_institutions ai ON ai.institution_id = i.id
            JOIN paper_authors pa ON pa.author_id = ai.author_id
+           JOIN authors a ON a.id = ai.author_id
            WHERE pa.scholar_id = ?
            GROUP BY i.id, i.display_name, i.country_code, i.type
            ORDER BY paper_count DESC, author_count DESC
@@ -28,6 +30,7 @@ export function makeExtractInstitutionsTool(db: D1Database, scholarId: string) {
           type: string | null;
           paper_count: number;
           author_count: number;
+          author_names: string | null;
         }>();
       return (results ?? []).map((r) => ({
         id: r.id,
@@ -36,6 +39,13 @@ export function makeExtractInstitutionsTool(db: D1Database, scholarId: string) {
         type: r.type,
         paperCount: r.paper_count,
         uniqueAuthorCount: r.author_count,
+        // GROUP_CONCAT(DISTINCT ...) is comma-joined (SQLite can't combine DISTINCT
+        // with a custom separator); split + trim + cap for the drill-down list.
+        authors: (r.author_names ?? "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+          .slice(0, 30),
       }));
     },
     {

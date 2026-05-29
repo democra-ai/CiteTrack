@@ -111,6 +111,8 @@ export interface CitingInstitution {
   type: string | null;
   paperCount: number;
   uniqueAuthorCount: number;
+  /// Names of the citing authors affiliated with this institution (for drill-down).
+  authors: string[];
 }
 
 export interface NotableCiter {

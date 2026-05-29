@@ -74,12 +74,18 @@ public final class CiteTrackAnalysisService {
     /// Submit a fresh analysis. Returns the job ID; poll `pollUntilDone` to wait for completion.
     /// `enrichedCitingPapers` is optional: when present, the worker uses it directly and
     /// skips its own OpenAlex calls (which are heavily rate-limited from CF's shared egress IP).
+    /// `analysisScholarIdOverride`: when set, the analysis is stored/keyed under this
+    /// id instead of `scholar.id`. The per-paper Insights flow passes a scoped id
+    /// ("<scholarId>~pub~<pubId>") so each selected paper gets its own independent
+    /// analysis partition (its own citing papers, result, and drill-downs) without
+    /// the scholar-wide `clearScholarCitingData` clobbering sibling papers.
     public func startAnalysis(
         scholar: Scholar,
         publications: [ScholarPublication],
         citingPapers: [CitingPaper],
         enrichedCitingPapers: [EnrichedCitingPaper]? = nil,
-        lang: String? = nil
+        lang: String? = nil,
+        analysisScholarIdOverride: String? = nil
     ) async throws -> String {
         guard !citingPapers.isEmpty else { throw AnalysisServiceError.noCitingPapers }
 
@@ -106,8 +112,9 @@ public final class CiteTrackAnalysisService {
         guard !safeCiting.isEmpty else { throw AnalysisServiceError.noCitingPapers }
 
         let trimmedName = scholar.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let effectiveScholarId = analysisScholarIdOverride ?? scholar.id
         let body = AnalyzeRequestBody(
-            scholarId: String(scholar.id.prefix(128)),
+            scholarId: String(effectiveScholarId.prefix(256)),
             scholarName: trimmedName.isEmpty ? scholar.id : String(trimmedName.prefix(256)),
             scholarAffiliation: nil,
             publications: publications.prefix(500).map { (p: ScholarPublication) -> AnalyzeRequestBody.Publication in
@@ -202,8 +209,11 @@ public final class CiteTrackAnalysisService {
     }
 
     /// Fetch the latest computed analysis result for a scholar (the most recent "done" job).
+    /// `scholarId` may be a per-paper scoped id ("<id>~pub~<pubId>"), so the path is
+    /// percent-encoded to keep the `~`/`:` characters transport-safe.
     public func fetchLatestResult(scholarId: String) async throws -> AnalysisResult? {
-        let req = try makeRequest(path: "/v1/scholars/\(scholarId)/analysis", method: "GET")
+        let encoded = scholarId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? scholarId
+        let req = try makeRequest(path: "/v1/scholars/\(encoded)/analysis", method: "GET")
         let (data, response) = try await session.data(for: req)
         if let http = response as? HTTPURLResponse, http.statusCode == 404 { return nil }
         try Self.check(response, data: data)

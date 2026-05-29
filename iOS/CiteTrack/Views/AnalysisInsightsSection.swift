@@ -6,6 +6,20 @@ struct AnalysisInsightsSection: View {
     let scholar: Scholar
     let publications: [ScholarPublication]
     let citingPapers: [CitingPaper]
+    /// When set, this section analyzes ONE of the scholar's publications in isolation.
+    /// The analysis is stored under a scoped id ("<scholarId>~pub~<publicationId>") so
+    /// each selected paper gets its own independent result + drill-downs.
+    var publicationId: String? = nil
+    var publicationTitle: String? = nil
+    /// When true (per-paper screens), runs the analysis automatically on first appear
+    /// if no cached result exists — so opening a paper "just analyzes it".
+    var autoRun: Bool = false
+
+    /// Backend storage key: scoped to the publication when per-paper, else scholar-wide.
+    private var analysisScholarId: String {
+        guard let pid = publicationId, !pid.isEmpty else { return scholar.id }
+        return "\(scholar.id)~pub~\(pid)"
+    }
 
     @State private var analysis: AnalysisResult?
     @State private var jobStatus: AnalysisJobStatus?
@@ -78,14 +92,19 @@ struct AnalysisInsightsSection: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .task(id: scholar.id) {
+        .task(id: analysisScholarId) {
             await loadCachedIfAvailable()
+            // Per-paper screens analyze on open when there's nothing cached yet,
+            // so tapping a paper "just runs" its analysis (one paper at a time).
+            if autoRun, analysis == nil, !isRunning, !citingPapers.isEmpty {
+                await run()
+            }
         }
     }
 
     private var haiyouEntryCard: some View {
         NavigationLink {
-            HaiyouScoreView(scholarId: scholar.id, scholarName: scholar.name)
+            HaiyouScoreView(scholarId: analysisScholarId, scholarName: scholar.name)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.seal.fill")
@@ -265,7 +284,7 @@ struct AnalysisInsightsSection: View {
         guard !cachedLoaded else { return }
         cachedLoaded = true
         do {
-            if let cached = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: scholar.id) {
+            if let cached = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: analysisScholarId) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.9)) {
                     analysis = cached
                 }
@@ -319,7 +338,8 @@ struct AnalysisInsightsSection: View {
                 publications: publications,
                 citingPapers: analysisPapers,
                 enrichedCitingPapers: enriched.isEmpty ? nil : enriched,
-                lang: lm.currentLanguage == .chinese ? "zh" : "en"
+                lang: lm.currentLanguage == .chinese ? "zh" : "en",
+                analysisScholarIdOverride: publicationId == nil ? nil : analysisScholarId
             )
         } catch {
             loadError = error.localizedDescription
@@ -346,7 +366,7 @@ struct AnalysisInsightsSection: View {
                 loadError = final.error ?? lm.localized("analysis_failed", fallback: "Analysis failed")
                 return
             }
-            if let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: scholar.id) {
+            if let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: analysisScholarId) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
                     analysis = result
                 }
@@ -389,7 +409,7 @@ struct AnalysisInsightsSection: View {
     private func deleteAnalysis() async {
         loadError = nil
         do {
-            try await CiteTrackAnalysisService.shared.deleteAnalysis(scholarId: scholar.id)
+            try await CiteTrackAnalysisService.shared.deleteAnalysis(scholarId: analysisScholarId)
             analysis = nil
             jobStatus = nil
             pendingJobId = nil
@@ -428,7 +448,7 @@ struct AnalysisInsightsSection: View {
 
         // 2) Job is done (or unknown) — fetch latest result.
         do {
-            if let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: scholar.id) {
+            if let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: analysisScholarId) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
                     analysis = result
                 }
@@ -464,22 +484,31 @@ private struct ResearchDirectionsCard: View {
                     .font(.caption).foregroundColor(.secondary)
             } else {
                 ForEach(directions) { d in
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text(d.label).font(.subheadline).fontWeight(.semibold)
-                            Spacer()
-                            GlassChip(text: "\(d.paperCount)", tint: .secondary)
-                        }
-                        if !d.summary.isEmpty {
-                            Text(d.summary).font(.caption).foregroundColor(.secondary)
-                        }
-                        if !d.keywords.isEmpty {
-                            FlowLayout(items: d.keywords) { kw in
-                                GlassChip(text: kw, tint: .blue)
+                    NavigationLink {
+                        ResearchDirectionDetailView(direction: d)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(d.label).font(.subheadline).fontWeight(.semibold)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                GlassChip(text: "\(d.paperCount)", tint: .secondary)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2.weight(.semibold)).foregroundColor(.secondary)
+                            }
+                            if !d.summary.isEmpty {
+                                Text(d.summary).font(.caption).foregroundColor(.secondary)
+                            }
+                            if !d.keywords.isEmpty {
+                                FlowLayout(items: d.keywords) { kw in
+                                    GlassChip(text: kw, tint: .blue)
+                                }
                             }
                         }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 4)
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -505,31 +534,40 @@ private struct TopCitedPapersCard: View {
                     .font(.caption).foregroundColor(.secondary)
             } else {
                 ForEach(papers.prefix(10)) { p in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("\(p.citationCount)")
-                            .font(.caption.monospacedDigit())
-                            .fontWeight(.semibold)
-                            .foregroundColor(.orange)
-                            .frame(minWidth: 50, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(p.title).font(.subheadline).lineLimit(2)
-                            HStack(spacing: 6) {
-                                if let y = p.year {
-                                    Text(String(y)).font(.caption2).foregroundColor(.secondary)
+                    NavigationLink {
+                        TopCitedPaperDetailView(paper: p)
+                    } label: {
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("\(p.citationCount)")
+                                .font(.caption.monospacedDigit())
+                                .fontWeight(.semibold)
+                                .foregroundColor(.orange)
+                                .frame(minWidth: 50, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(p.title).font(.subheadline).foregroundColor(.primary).lineLimit(2)
+                                HStack(spacing: 6) {
+                                    if let y = p.year {
+                                        Text(String(y)).font(.caption2).foregroundColor(.secondary)
+                                    }
+                                    if let v = p.venue {
+                                        Text(v).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                                    }
                                 }
-                                if let v = p.venue {
-                                    Text(v).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                                if !p.authors.isEmpty {
+                                    Text(p.authors.prefix(3).joined(separator: ", "))
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
                                 }
                             }
-                            if !p.authors.isEmpty {
-                                Text(p.authors.prefix(3).joined(separator: ", "))
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.semibold)).foregroundColor(.secondary)
                         }
+                        .padding(.vertical, 3)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 3)
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -556,26 +594,35 @@ private struct CitingInstitutionsCard: View {
                 degradedNotice
             } else {
                 ForEach(institutions.prefix(15)) { inst in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("\(inst.paperCount)")
-                            .font(.caption.monospacedDigit())
-                            .fontWeight(.semibold)
-                            .frame(minWidth: 30, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(inst.name).font(.subheadline).lineLimit(2)
-                            HStack(spacing: 6) {
-                                if let c = inst.country {
-                                    Text(c).font(.caption2).foregroundColor(.secondary)
+                    NavigationLink {
+                        CitingInstitutionDetailView(institution: inst)
+                    } label: {
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("\(inst.paperCount)")
+                                .font(.caption.monospacedDigit())
+                                .fontWeight(.semibold)
+                                .frame(minWidth: 30, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(inst.name).font(.subheadline).foregroundColor(.primary).lineLimit(2)
+                                HStack(spacing: 6) {
+                                    if let c = inst.country {
+                                        Text(c).font(.caption2).foregroundColor(.secondary)
+                                    }
+                                    if let t = inst.type {
+                                        Text(t).font(.caption2).foregroundColor(.secondary)
+                                    }
+                                    Text(String(format: lm.localized("analysis_authors_n", fallback: "%d authors"), inst.uniqueAuthorCount))
+                                        .font(.caption2).foregroundColor(.secondary)
                                 }
-                                if let t = inst.type {
-                                    Text(t).font(.caption2).foregroundColor(.secondary)
-                                }
-                                Text(String(format: lm.localized("analysis_authors_n", fallback: "%d authors"), inst.uniqueAuthorCount))
-                                    .font(.caption2).foregroundColor(.secondary)
                             }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.semibold)).foregroundColor(.secondary)
                         }
+                        .padding(.vertical, 3)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 3)
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -632,27 +679,36 @@ private struct NotableCitersCard: View {
                 }
             } else {
                 ForEach(citers.prefix(15)) { n in
-                    HStack(alignment: .top, spacing: 8) {
-                        if let h = n.hIndex {
-                            Text("h\(h)")
-                                .font(.caption.monospacedDigit())
-                                .fontWeight(.semibold)
-                                .foregroundColor(.purple)
-                                .frame(minWidth: 36, alignment: .leading)
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(n.name).font(.subheadline).fontWeight(.medium)
-                            if let aff = n.affiliation {
-                                Text(aff).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                    NavigationLink {
+                        NotableCiterDetailView(citer: n)
+                    } label: {
+                        HStack(alignment: .top, spacing: 8) {
+                            if let h = n.hIndex {
+                                Text("h\(h)")
+                                    .font(.caption.monospacedDigit())
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.purple)
+                                    .frame(minWidth: 36, alignment: .leading)
                             }
-                            if let cited = n.citedByCount {
-                                Text(String(format: lm.localized("analysis_citedby_n", fallback: "%d total citations"), cited))
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(n.name).font(.subheadline).fontWeight(.medium).foregroundColor(.primary)
+                                if let aff = n.affiliation {
+                                    Text(aff).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                                }
+                                if let cited = n.citedByCount {
+                                    Text(String(format: lm.localized("analysis_citedby_n", fallback: "%d total citations"), cited))
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
                             }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.semibold)).foregroundColor(.secondary)
                         }
+                        .padding(.vertical, 3)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 3)
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -781,6 +837,242 @@ private struct VenueCitingPapersView: View {
     }
 
     private func venueURL(_ s: String?) -> URL? {
+        guard let s, s.hasPrefix("http") else { return nil }
+        return URL(string: s)
+    }
+}
+
+// MARK: - Research-direction drill-down: the cluster summary + example papers
+
+private struct ResearchDirectionDetailView: View {
+    let direction: ResearchDirection
+    private let lm = LocalizationManager.shared
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(String(format: lm.localized("analysis_direction_paper_count", fallback: "%d papers in this direction"), direction.paperCount))
+                            .font(.caption).foregroundColor(.secondary)
+                        if !direction.summary.isEmpty {
+                            Text(direction.summary).font(.callout).foregroundColor(.primary)
+                        }
+                        if !direction.keywords.isEmpty {
+                            FlowLayout(items: direction.keywords) { kw in
+                                GlassChip(text: kw, tint: .blue)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if !direction.examplePapers.isEmpty {
+                    Text(lm.localized("analysis_example_papers", fallback: "Example papers"))
+                        .font(.caption).fontWeight(.semibold).foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ForEach(direction.examplePapers) { p in
+                        GlassCard {
+                            Text(p.title).font(.subheadline).foregroundColor(.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+            .padding(GlassMetrics.screenPadding)
+        }
+        .liquidGlassCanvas()
+        .navigationTitle(direction.label)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Notable-citer drill-down: profile stats + which of their papers cite you
+
+private struct NotableCiterDetailView: View {
+    let citer: NotableCiter
+    private let lm = LocalizationManager.shared
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let aff = citer.affiliation, !aff.isEmpty {
+                            Label(aff, systemImage: "building.columns")
+                                .font(.callout).foregroundColor(.primary)
+                        }
+                        HStack(spacing: 18) {
+                            if let h = citer.hIndex {
+                                statPair(value: "h\(h)", label: lm.localized("analysis_hindex", fallback: "h-index"))
+                            }
+                            if let cited = citer.citedByCount {
+                                statPair(value: "\(cited)", label: lm.localized("analysis_citations_label", fallback: "Citations"))
+                            }
+                            if let works = citer.worksCount {
+                                statPair(value: "\(works)", label: lm.localized("analysis_works_label", fallback: "Works"))
+                            }
+                        }
+                        if let oa = citer.openalexId, let url = openAlexURL(oa) {
+                            Link(destination: url) {
+                                Label(lm.localized("analysis_view_openalex", fallback: "View on OpenAlex"), systemImage: "safari")
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if !citer.examplePapers.isEmpty {
+                    Text(String(format: lm.localized("analysis_citer_papers", fallback: "%d of their papers cite you"), citer.paperCount))
+                        .font(.caption).foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ForEach(citer.examplePapers) { p in
+                        GlassCard {
+                            Text(p.title).font(.subheadline).foregroundColor(.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+            .padding(GlassMetrics.screenPadding)
+        }
+        .liquidGlassCanvas()
+        .navigationTitle(citer.name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func statPair(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value).font(.headline).foregroundColor(.purple)
+            Text(label).font(.caption2).foregroundColor(.secondary)
+        }
+    }
+
+    private func openAlexURL(_ id: String) -> URL? {
+        if id.hasPrefix("http") { return URL(string: id) }
+        return URL(string: "https://openalex.org/\(id)")
+    }
+}
+
+// MARK: - Institution drill-down: stats + the authors from there who cited you
+
+private struct CitingInstitutionDetailView: View {
+    let institution: CitingInstitution
+    private let lm = LocalizationManager.shared
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 18) {
+                            statPair(value: "\(institution.paperCount)", label: lm.localized("insights_citing_papers", fallback: "Citing papers"))
+                            statPair(value: "\(institution.uniqueAuthorCount)", label: lm.localized("analysis_authors_label", fallback: "Authors"))
+                        }
+                        HStack(spacing: 8) {
+                            if let c = institution.country, !c.isEmpty {
+                                GlassChip(text: c, tint: .secondary)
+                            }
+                            if let t = institution.type, !t.isEmpty {
+                                GlassChip(text: t, tint: .secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if !institution.authors.isEmpty {
+                    Text(lm.localized("analysis_institution_authors", fallback: "Authors who cited you"))
+                        .font(.caption).fontWeight(.semibold).foregroundColor(.secondary).textCase(.uppercase)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 7) {
+                            ForEach(Array(institution.authors.enumerated()), id: \.offset) { _, name in
+                                HStack(spacing: 8) {
+                                    Image(systemName: "person.fill").font(.caption2).foregroundColor(.secondary)
+                                    Text(name).font(.subheadline).foregroundColor(.primary)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else {
+                    GlassCard {
+                        Text(lm.localized("analysis_institution_no_authors", fallback: "Author details unavailable for this institution."))
+                            .font(.caption).foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .padding(GlassMetrics.screenPadding)
+        }
+        .liquidGlassCanvas()
+        .navigationTitle(institution.name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func statPair(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value).font(.headline).foregroundColor(.primary)
+            Text(label).font(.caption2).foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - Top-cited drill-down: full paper detail + open in browser
+
+private struct TopCitedPaperDetailView: View {
+    let paper: TopCitedPaper
+    private let lm = LocalizationManager.shared
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(paper.title).font(.headline).foregroundColor(.primary)
+                        if !paper.authors.isEmpty {
+                            Text(paper.authors.prefix(10).joined(separator: ", ")
+                                 + (paper.authors.count > 10 ? " " + "et_al".localized : ""))
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                        HStack(spacing: 18) {
+                            statPair(value: "\(paper.citationCount)", label: lm.localized("analysis_citations_label", fallback: "Citations"), tint: .orange)
+                            if let y = paper.year {
+                                statPair(value: "\(y)", label: lm.localized("analysis_year_label", fallback: "Year"), tint: .primary)
+                            }
+                        }
+                        if let v = paper.venue, !v.isEmpty {
+                            Label(v, systemImage: "books.vertical").font(.caption).foregroundColor(.secondary)
+                        }
+                        if let link = paperURL(paper.scholarUrl) {
+                            Link(destination: link) {
+                                Label(lm.localized("open_in_browser", fallback: "Open in browser"), systemImage: "safari")
+                                    .font(.callout)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(GlassMetrics.screenPadding)
+        }
+        .liquidGlassCanvas()
+        .navigationTitle(lm.localized("analysis_paper_detail_title", fallback: "Citing paper"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func statPair(value: String, label: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value).font(.headline).foregroundColor(tint)
+            Text(label).font(.caption2).foregroundColor(.secondary)
+        }
+    }
+
+    private func paperURL(_ s: String?) -> URL? {
         guard let s, s.hasPrefix("http") else { return nil }
         return URL(string: s)
     }

@@ -110,6 +110,24 @@ public struct CitingInstitution: Codable, Hashable, Identifiable {
     public let type: String?
     public let paperCount: Int
     public let uniqueAuthorCount: Int
+    /// Names of citing authors affiliated with this institution (for drill-down).
+    public let authors: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, country, type, paperCount, uniqueAuthorCount, authors
+    }
+
+    // Custom decode so results stored before `authors` existed still load.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        country = try c.decodeIfPresent(String.self, forKey: .country)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        paperCount = try c.decodeIfPresent(Int.self, forKey: .paperCount) ?? 0
+        uniqueAuthorCount = try c.decodeIfPresent(Int.self, forKey: .uniqueAuthorCount) ?? 0
+        authors = try c.decodeIfPresent([String].self, forKey: .authors) ?? []
+    }
 }
 
 public struct NotableCiter: Codable, Hashable, Identifiable {
