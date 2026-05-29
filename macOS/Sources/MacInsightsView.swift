@@ -23,6 +23,8 @@ struct MacInsightsView: View {
     @State private var selectedScholarId: String = ""
     @State private var analysis: AnalysisResult?
     @State private var isLoading = false
+    @State private var isRunning = false
+    @State private var runStep = ""
     @State private var loadError: String?
 
     private var selectedScholar: Scholar? { scholars.first { $0.id == selectedScholarId } }
@@ -33,11 +35,12 @@ struct MacInsightsView: View {
                 VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
                     headerCard
 
-                    if isLoading {
+                    if isLoading || isRunning {
                         GlassCard {
                             HStack(spacing: 10) {
                                 ProgressView().controlSize(.small)
-                                Text("Loading analysis…").font(.callout).foregroundColor(.secondary)
+                                Text(isRunning ? (runStep.isEmpty ? "Running analysis…" : runStep) : "Loading analysis…")
+                                    .font(.callout).foregroundColor(.secondary)
                             }
                         }
                     }
@@ -51,13 +54,18 @@ struct MacInsightsView: View {
 
                     if let analysis {
                         resultCards(analysis)
-                    } else if !isLoading && loadError == nil && !selectedScholarId.isEmpty {
+                    } else if !isLoading && !isRunning && loadError == nil && !selectedScholarId.isEmpty {
                         GlassCard {
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 Text("No analysis yet for this scholar.")
                                     .font(.callout)
-                                Text("Run the citation analysis on iOS (or once the macOS run flow lands), and it appears here automatically.")
+                                Text("Run a citation analysis to see research directions, notable venues, top-cited papers, and notable citers.")
                                     .font(.caption).foregroundColor(.secondary)
+                                Button { runAnalysis() } label: {
+                                    Label("Run analysis", systemImage: "sparkles")
+                                }
+                                .disabled(isRunning)
+                                .padding(.top, 4)
                             }
                         }
                     }
@@ -87,11 +95,15 @@ struct MacInsightsView: View {
                     .labelsHidden()
                     .onChange(of: selectedScholarId) { _ in fetchResult() }
 
-                    HStack {
+                    HStack(spacing: 10) {
+                        Button { runAnalysis() } label: {
+                            Label(analysis == nil ? "Run analysis" : "Re-run", systemImage: "sparkles")
+                        }
+                        .disabled(selectedScholarId.isEmpty || isRunning)
                         Button { fetchResult() } label: {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
-                        .disabled(selectedScholarId.isEmpty || isLoading)
+                        .disabled(selectedScholarId.isEmpty || isLoading || isRunning)
                         Spacer()
                     }
                 }
@@ -250,6 +262,96 @@ struct MacInsightsView: View {
                 await MainActor.run {
                     self.analysis = nil
                     self.isLoading = false
+                    self.loadError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    /// Full on-device run: fetch the scholar's publications, fetch citing papers +
+    /// contexts (Semantic Scholar), enrich (OpenAlex on this machine's IP), then ask
+    /// the worker to analyze. Mirrors the iOS pipeline.
+    private func runAnalysis() {
+        guard !selectedScholarId.isEmpty, let scholar = selectedScholar else { return }
+        isRunning = true
+        loadError = nil
+        runStep = "Fetching publications…"
+        let sid = selectedScholarId
+        let sname = scholar.name
+        let lang = (Locale.preferredLanguages.first ?? "en").hasPrefix("zh") ? "zh" : "en"
+        Task {
+            do {
+                // 1. Publications — cache first, else fetch from Google Scholar.
+                var pubs = UnifiedCacheManager.shared.getPublications(
+                    scholarId: sid, sortBy: "total", startIndex: 0, limit: 1000
+                ) ?? []
+                if pubs.isEmpty {
+                    pubs = await withCheckedContinuation { (cont: CheckedContinuation<[ScholarPublication], Never>) in
+                        CitationFetchService.shared.fetchScholarPublications(
+                            for: sid, sortBy: nil, startIndex: 0, forceRefresh: false
+                        ) { result in
+                            switch result {
+                            case .success(let p): cont.resume(returning: p)
+                            case .failure: cont.resume(returning: [])
+                            }
+                        }
+                    }
+                }
+                guard !pubs.isEmpty else {
+                    await MainActor.run { isRunning = false; runStep = ""; loadError = "Couldn't load this scholar's publications." }
+                    return
+                }
+                // Cap to the most-cited publications to bound runtime / rate limits.
+                let topPubs = Array(pubs.sorted { ($0.citationCount ?? 0) > ($1.citationCount ?? 0) }.prefix(40))
+                let pubInfos = topPubs.map {
+                    PublicationInfo(id: $0.id, title: $0.title, clusterId: $0.clusterId, citationCount: $0.citationCount, year: $0.year)
+                }
+
+                // 2. Citing papers + contexts (Semantic Scholar, per publication).
+                await MainActor.run { runStep = "Fetching citing papers…" }
+                let results = await CitationContextService.shared.fetchAllContextsForScholar(
+                    scholarId: sid, scholarName: sname, publications: pubInfos
+                )
+
+                // 3. Flatten + dedupe into CitingPaper.
+                var byId: [String: CitingPaper] = [:]
+                for pub in results {
+                    for cp in pub.citingPapers where byId[cp.id] == nil {
+                        byId[cp.id] = CitingPaper(
+                            id: cp.id, title: cp.citingPaperTitle, authors: cp.citingAuthors,
+                            year: cp.citingYear, venue: nil, citationCount: nil,
+                            abstract: cp.contexts.isEmpty ? nil : cp.contexts.joined(separator: " "),
+                            scholarUrl: nil, pdfUrl: nil, citedScholarId: sid
+                        )
+                    }
+                }
+                let citing = Array(byId.values)
+                guard !citing.isEmpty else {
+                    await MainActor.run { isRunning = false; runStep = ""; loadError = "No citing papers found for this scholar yet." }
+                    return
+                }
+
+                // 4. Enrich (OpenAlex) + analyze (capped to bound the worker's wall time).
+                await MainActor.run { runStep = "Enriching via OpenAlex…" }
+                let analysisPapers = Array(citing.prefix(200))
+                let enriched = await OpenAlexEnrichmentClient.shared.enrich(citingPapers: analysisPapers, concurrency: 6)
+
+                await MainActor.run { runStep = "Analyzing…" }
+                let jobId = try await CiteTrackAnalysisService.shared.startAnalysis(
+                    scholar: scholar, publications: topPubs, citingPapers: analysisPapers,
+                    enrichedCitingPapers: enriched.isEmpty ? nil : enriched, lang: lang
+                )
+                _ = try await CiteTrackAnalysisService.shared.pollUntilDone(jobId: jobId)
+                let result = try await CiteTrackAnalysisService.shared.fetchLatestResult(scholarId: sid)
+                await MainActor.run {
+                    self.analysis = result
+                    self.isRunning = false
+                    self.runStep = ""
+                }
+            } catch {
+                await MainActor.run {
+                    self.isRunning = false
+                    self.runStep = ""
                     self.loadError = error.localizedDescription
                 }
             }
