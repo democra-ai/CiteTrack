@@ -65,7 +65,6 @@ struct MacInsightsView: View {
                 .padding(GlassMetrics.screenPadding)
             }
             .liquidGlassCanvas()
-            .navigationTitle("Citation Insights")
         }
         .onAppear(perform: load)
     }

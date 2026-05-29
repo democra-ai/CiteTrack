@@ -82,10 +82,6 @@ struct GeneralSettingsTab: View {
                 .onChange(of: selectedLanguageIndex) { newValue in
                     LocalizationManager.shared.setLanguage(languages[newValue])
                 }
-            } header: {
-                Label(L("setting_update_interval"), systemImage: "clock.arrow.circlepath")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
             }
 
             Section {
@@ -104,10 +100,6 @@ struct GeneralSettingsTab: View {
                     .onChange(of: launchAtLogin) { newValue in
                         PreferencesManager.shared.launchAtLogin = newValue
                     }
-            } header: {
-                Label(L("setting_show_in_dock"), systemImage: "macwindow")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
             }
 
             Section {

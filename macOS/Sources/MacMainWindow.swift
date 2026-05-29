@@ -60,6 +60,7 @@ struct MacMainWindow: View {
         } detail: {
             detail
                 .frame(minWidth: 560, minHeight: 560)
+                .navigationTitle(state.section.title)
         }
     }
 
@@ -132,7 +133,6 @@ struct MacScholarsView: View {
             .padding(GlassMetrics.screenPadding)
         }
         .liquidGlassCanvas()
-        .navigationTitle("Scholars")
         .onAppear { scholars = PreferencesManager.shared.scholars }
     }
 }

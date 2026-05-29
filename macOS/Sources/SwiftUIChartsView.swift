@@ -22,14 +22,9 @@ struct ChartsContentView: View {
                     Divider()
                         .opacity(0.3)
 
-                    HStack(spacing: 20) {
-                        VStack(spacing: 16) {
-                            DashboardStripView(viewModel: viewModel)
-                            CitationChartView(viewModel: viewModel)
-                        }
-
-                        InsightSidebarView(viewModel: viewModel)
-                            .frame(width: 220)
+                    VStack(spacing: 16) {
+                        DashboardStripView(viewModel: viewModel)
+                        CitationChartView(viewModel: viewModel)
                     }
                     .padding(.horizontal, 28)
                     .padding(.top, 18)
@@ -607,8 +602,10 @@ struct CustomRangeSheet: View {
 struct DashboardStripView: View {
     @ObservedObject var viewModel: ChartsViewModel
 
+    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+
     var body: some View {
-        HStack(spacing: 12) {
+        LazyVGrid(columns: columns, spacing: 12) {
             if let data = viewModel.chartData, let scholar = viewModel.currentScholar {
                 let stats = data.statistics
 
