@@ -47,6 +47,7 @@
 		D1B0A0D6E4BCC81390A8511F /* DataRepairViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DEB81CB7485CA1AE278D1F8 /* DataRepairViewController.swift */; };
 		E5382A5D6E344E2EB79B0A0C /* CitationCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 002A29E87D14470BACF2D64C /* CitationCacheService.swift */; };
 		E886B418385CB02D07759C14 /* CitationHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64A1948FEF426329EAA06D07 /* CitationHistory.swift */; };
+		EDD6D0C66E7CE2E423CFDE4D /* MacMainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21E2096F274AC5DF28AC431 /* MacMainWindow.swift */; };
 		EE8E71B7F70B0FB3273E2A11 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0E9CD073C6469F5298E7572 /* main.swift */; };
 		F12DDF4ED3DBB54561D0553C /* LiquidGlassMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776F326CB6A4120E25E07FAB /* LiquidGlassMac.swift */; };
 		F93941F9D9C3451182C89A15 /* CitingAuthor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A726D21159D428AB39585C5 /* CitingAuthor.swift */; };
@@ -102,6 +103,7 @@
 		9EAE454AF13A0AC2030512B8 /* ChartsWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChartsWindowController.swift; sourceTree = "<group>"; };
 		AD84EBC806E3367F23A120D5 /* ChartsViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChartsViewController.swift; sourceTree = "<group>"; };
 		B0007BC3FE9A72AF5E7C0355 /* CitationContext.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CitationContext.swift; path = ../../Shared/Models/CitationContext.swift; sourceTree = "<group>"; };
+		B21E2096F274AC5DF28AC431 /* MacMainWindow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacMainWindow.swift; sourceTree = "<group>"; };
 		B46969BCF75C4050B90B2387 /* UnifiedCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = UnifiedCacheManager.swift; path = ../../Shared/Services/UnifiedCacheManager.swift; sourceTree = "<group>"; };
 		B4FF06F0FAE06F6171C8ED1D /* MacInsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacInsightsView.swift; sourceTree = "<group>"; };
 		BA80A91B9284EDEB9D913C79 /* PublicationInfoShim.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PublicationInfoShim.swift; sourceTree = "<group>"; };
@@ -182,6 +184,7 @@
 				BA80A91B9284EDEB9D913C79 /* PublicationInfoShim.swift */,
 				776F326CB6A4120E25E07FAB /* LiquidGlassMac.swift */,
 				B4FF06F0FAE06F6171C8ED1D /* MacInsightsView.swift */,
+				B21E2096F274AC5DF28AC431 /* MacMainWindow.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -336,6 +339,7 @@
 				9FCE188050BA6E6B3BA802D4 /* PublicationInfoShim.swift in Sources */,
 				F12DDF4ED3DBB54561D0553C /* LiquidGlassMac.swift in Sources */,
 				A89B568F0BE8CAF0A803537B /* MacInsightsView.swift in Sources */,
+				EDD6D0C66E7CE2E423CFDE4D /* MacMainWindow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -19,7 +19,6 @@ struct MacInsightsRootView: View {
 
 // MARK: - Insights
 struct MacInsightsView: View {
-    @ObservedObject private var auth = GoogleAuthService.shared
     @State private var scholars: [Scholar] = []
     @State private var selectedScholarId: String = ""
     @State private var analysis: AnalysisResult?
@@ -75,24 +74,8 @@ struct MacInsightsView: View {
     private var headerCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Scholar").font(.caption).foregroundColor(.secondary)
-                    Spacer()
-                    if let user = auth.currentUser {
-                        Menu {
-                            Text(user.email).font(.caption)
-                            Divider()
-                            Button("Sign Out", role: .destructive) { auth.signOut() }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "person.crop.circle.fill")
-                                Text(user.displayName).lineLimit(1)
-                            }.font(.caption)
-                        }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                    }
-                }
+                Text("Scholar").font(.caption).foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 if scholars.isEmpty {
                     Text("No scholars yet — add one in the menu-bar app first.")
                         .font(.callout).foregroundColor(.secondary)

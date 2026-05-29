@@ -536,6 +536,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 首先设置应用为常规模式，确保显示在 Dock 中
         NSApp.setActivationPolicy(.regular)
 
+        // Open the unified main window as the primary front-end (sidebar:
+        // Scholars / Charts / Insights / Settings), instead of only the status bar.
+        DispatchQueue.main.async { MainWindowController.shared.show() }
+
         // Initialize Core Data stack
         initializeCoreData()
         
@@ -766,6 +770,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        let openItem = NSMenuItem(title: "Open CiteTrack", action: #selector(openMainWindow), keyEquivalent: "0")
+        openItem.target = self
+        if #available(macOS 11.0, *) {
+            openItem.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
+        }
+        menu.addItem(openItem)
+        menu.addItem(NSMenuItem.separator())
+
         let refreshItem = NSMenuItem(title: L("menu_manual_update"), action: #selector(refreshCitations), keyEquivalent: "r")
         refreshItem.target = self
         if #available(macOS 11.0, *) {
@@ -773,21 +785,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.addItem(refreshItem)
 
-        let settingsItem = NSMenuItem(title: L("menu_preferences"), action: #selector(showSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: L("menu_preferences"), action: #selector(openMainWindowSettings), keyEquivalent: ",")
         settingsItem.target = self
         if #available(macOS 11.0, *) {
             settingsItem.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)
         }
         menu.addItem(settingsItem)
 
-        let chartsItem = NSMenuItem(title: L("menu_charts"), action: #selector(showCharts), keyEquivalent: "")
+        let chartsItem = NSMenuItem(title: L("menu_charts"), action: #selector(openMainWindowCharts), keyEquivalent: "")
         chartsItem.target = self
         if #available(macOS 11.0, *) {
             chartsItem.image = NSImage(systemSymbolName: "rectangle.grid.2x2", accessibilityDescription: nil)
         }
         menu.addItem(chartsItem)
 
-        let insightsItem = NSMenuItem(title: "Citation Insights…", action: #selector(showInsights), keyEquivalent: "i")
+        let insightsItem = NSMenuItem(title: "Citation Insights…", action: #selector(openMainWindowInsights), keyEquivalent: "i")
         insightsItem.target = self
         if #available(macOS 11.0, *) {
             insightsItem.image = NSImage(systemSymbolName: "quote.bubble", accessibilityDescription: nil)
@@ -845,6 +857,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showInsights() {
         InsightsWindowController.shared.show()
     }
+
+    // Unified main window entry points (replace the scattered separate windows).
+    @objc private func openMainWindow() { MainWindowController.shared.show() }
+    @objc private func openMainWindowSettings() { MainWindowController.shared.show(section: .settings) }
+    @objc private func openMainWindowCharts() { MainWindowController.shared.show(section: .charts) }
+    @objc private func openMainWindowInsights() { MainWindowController.shared.show(section: .insights) }
 
     @objc private func signOutGoogle() {
         GoogleAuthService.shared.signOut()
