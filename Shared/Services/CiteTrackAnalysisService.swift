@@ -29,6 +29,7 @@ private struct AnalyzeRequestBody: Encodable {
     let publications: [Publication]
     let citingPapers: [CitingPaperPayload]
     let enrichedCitingPapers: [EnrichedCitingPaper]?
+    let lang: String?
 
     struct Publication: Encodable {
         let id: String
@@ -77,7 +78,8 @@ public final class CiteTrackAnalysisService {
         scholar: Scholar,
         publications: [ScholarPublication],
         citingPapers: [CitingPaper],
-        enrichedCitingPapers: [EnrichedCitingPaper]? = nil
+        enrichedCitingPapers: [EnrichedCitingPaper]? = nil,
+        lang: String? = nil
     ) async throws -> String {
         guard !citingPapers.isEmpty else { throw AnalysisServiceError.noCitingPapers }
 
@@ -117,7 +119,8 @@ public final class CiteTrackAnalysisService {
                 )
             },
             citingPapers: safeCiting,
-            enrichedCitingPapers: sanitizeEnriched(enrichedCitingPapers)
+            enrichedCitingPapers: sanitizeEnriched(enrichedCitingPapers),
+            lang: lang
         )
 
         var req = try makeRequest(path: "/v1/analyze", method: "POST")
@@ -161,7 +164,9 @@ public final class CiteTrackAnalysisService {
                             )
                         }
                     )
-                }
+                },
+                venueName: p.venueName.map { String($0.prefix(256)) },
+                venueType: p.venueType
             )
         }
     }
@@ -216,13 +221,15 @@ public final class CiteTrackAnalysisService {
         publications: [ScholarPublication],
         citingPapers: [CitingPaper],
         enrichedCitingPapers: [EnrichedCitingPaper]? = nil,
+        lang: String? = nil,
         progress: ((AnalysisJobStatus) -> Void)? = nil
     ) async throws -> AnalysisResult {
         let jobId = try await startAnalysis(
             scholar: scholar,
             publications: publications,
             citingPapers: citingPapers,
-            enrichedCitingPapers: enrichedCitingPapers
+            enrichedCitingPapers: enrichedCitingPapers,
+            lang: lang
         )
         let final = try await pollUntilDone(jobId: jobId, progress: progress)
         if final.status == "error" {

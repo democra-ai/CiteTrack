@@ -30,6 +30,39 @@ public struct EnrichedCitingPaper: Codable, Hashable {
     public let abstract: String?
     public let citationCount: Int?
     public let authors: [EnrichedAuthor]
+    /// Venue (journal / conference / repository) the citing paper appeared in,
+    /// from OpenAlex primary_location.source. Powers the "top venues" metric.
+    public let venueName: String?
+    public let venueType: String?
+
+    public init(
+        id: String,
+        openalexWorkId: String?,
+        abstract: String?,
+        citationCount: Int?,
+        authors: [EnrichedAuthor],
+        venueName: String? = nil,
+        venueType: String? = nil
+    ) {
+        self.id = id
+        self.openalexWorkId = openalexWorkId
+        self.abstract = abstract
+        self.citationCount = citationCount
+        self.authors = authors
+        self.venueName = venueName
+        self.venueType = venueType
+    }
+}
+
+/// Authoritative author-position info for one of the scholar's OWN publications,
+/// resolved from OpenAlex (complete author list, author_position, is_corresponding).
+/// Used to fix mis-detection caused by truncated/incomplete Semantic Scholar or
+/// Google Scholar author lists.
+public struct OpenAlexOwnAuthorship: Hashable {
+    public let authorPosition: String?   // "first" | "middle" | "last"
+    public let isCorresponding: Bool
+    public let authorNames: [String]     // complete, ordered author display names
+    public let matchedIndex: Int?        // scholar's index within authorNames
 }
 
 // MARK: - OpenAlex enrichment client
@@ -161,15 +194,51 @@ public final class OpenAlexEnrichmentClient {
                     institutions: institutions
                 ))
             }
+            let source = work.primaryLocation?.source
             out.append(EnrichedCitingPaper(
                 id: id,
                 openalexWorkId: work.id,
                 abstract: abstract,
                 citationCount: work.citedByCount,
-                authors: enrichedAuthors
+                authors: enrichedAuthors,
+                venueName: source?.displayName,
+                venueType: source?.type
             ))
         }
         return out
+    }
+
+    // MARK: - Resolve the scholar's own authorship (authoritative)
+
+    /// Resolve one of the scholar's OWN publications in OpenAlex and return the
+    /// complete ordered author list plus the scholar's author_position /
+    /// is_corresponding. OpenAlex author lists are complete, so this fixes the
+    /// "middle author shown as corresponding because the fetched list was
+    /// truncated and they happened to be last" problem. Returns nil if the paper
+    /// can't be matched in OpenAlex.
+    public func resolveOwnAuthorship(title: String, year: Int?, scholarName: String) async -> OpenAlexOwnAuthorship? {
+        guard let work = await searchWork(title: title, year: year) else { return nil }
+        let names = work.authorships.map { $0.author.displayName }
+        guard !names.isEmpty else { return nil }
+        var matched: Int? = nil
+        for (i, ship) in work.authorships.enumerated() {
+            if CitationContextService.PublicationWithAuthors.namesMatch(ship.author.displayName, scholarName) {
+                matched = i
+                break
+            }
+        }
+        guard let idx = matched else {
+            // Scholar not found among OpenAlex authors — still return the complete
+            // list (useful for display) but no role signal.
+            return OpenAlexOwnAuthorship(authorPosition: nil, isCorresponding: false, authorNames: names, matchedIndex: nil)
+        }
+        let ship = work.authorships[idx]
+        return OpenAlexOwnAuthorship(
+            authorPosition: ship.authorPosition,
+            isCorresponding: ship.isCorresponding ?? false,
+            authorNames: names,
+            matchedIndex: idx
+        )
     }
 
     // MARK: - HTTP
@@ -181,7 +250,7 @@ public final class OpenAlexEnrichmentClient {
         components?.queryItems = [
             URLQueryItem(name: "search", value: String(trimmed.prefix(200))),
             URLQueryItem(name: "per_page", value: "5"),
-            URLQueryItem(name: "select", value: "id,title,publication_year,cited_by_count,authorships,abstract_inverted_index"),
+            URLQueryItem(name: "select", value: "id,title,publication_year,cited_by_count,authorships,abstract_inverted_index,primary_location"),
             URLQueryItem(name: "mailto", value: mailto),
         ]
         guard let url = components?.url else { return nil }
@@ -354,6 +423,7 @@ struct OpenAlexWork: Codable, Hashable {
     let citedByCount: Int?
     let authorships: [OpenAlexAuthorship]
     let abstractInvertedIndex: [String: [Int]]?
+    let primaryLocation: OpenAlexLocation?
 
     enum CodingKeys: String, CodingKey {
         case id, title
@@ -361,12 +431,38 @@ struct OpenAlexWork: Codable, Hashable {
         case citedByCount = "cited_by_count"
         case authorships
         case abstractInvertedIndex = "abstract_inverted_index"
+        case primaryLocation = "primary_location"
+    }
+}
+
+struct OpenAlexLocation: Codable, Hashable {
+    let source: OpenAlexSource?
+}
+
+struct OpenAlexSource: Codable, Hashable {
+    let id: String?
+    let displayName: String?
+    let type: String?   // "journal" | "conference" | "repository" | "book series" | ...
+    let hostOrganizationName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type
+        case displayName = "display_name"
+        case hostOrganizationName = "host_organization_name"
     }
 }
 
 struct OpenAlexAuthorship: Codable, Hashable {
     let author: OpenAlexAuthorRef
     let institutions: [OpenAlexInstitution]?
+    let authorPosition: String?   // "first" | "middle" | "last"
+    let isCorresponding: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case author, institutions
+        case authorPosition = "author_position"
+        case isCorresponding = "is_corresponding"
+    }
 }
 
 struct OpenAlexAuthorRef: Codable, Hashable {

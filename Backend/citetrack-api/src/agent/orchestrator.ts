@@ -21,6 +21,7 @@ import { runEnrichment } from "./enrichment_pipeline";
 import { makeClusterTopicsTool } from "./tools/cluster_topics";
 import { makeRankTopCitedTool } from "./tools/rank_top_cited";
 import { makeExtractInstitutionsTool } from "./tools/extract_institutions";
+import { makeExtractTopVenuesTool } from "./tools/extract_top_venues";
 import { makeFindNotableScholarsTool } from "./tools/find_notable_scholars";
 import { runHaiyouScoring } from "./scoring/haiyou";
 import { TrackedAi } from "../lib/usage";
@@ -182,7 +183,8 @@ export async function runAnalysisJob(env: Env, jobId: string, req: AnalyzeReques
       tracked.asAi(),
       req.scholarId,
       req.scholarName,
-      req.scholarAffiliation ?? null
+      req.scholarAffiliation ?? null,
+      req.lang ?? "en"
     );
     const directions = await invokeTool<AnalysisResult["researchDirections"]>(
       clusterTool,
@@ -206,6 +208,14 @@ export async function runAnalysisJob(env: Env, jobId: string, req: AnalyzeReques
       trace
     );
 
+    await setStep("aggregating venues", 92);
+    const venuesTool = makeExtractTopVenuesTool(env.DB, req.scholarId);
+    const topVenues = await invokeTool<AnalysisResult["topVenues"]>(
+      venuesTool,
+      { topN: 20 },
+      trace
+    );
+
     await setStep("finding notable citers", 95);
     const notableTool = makeFindNotableScholarsTool(env.DB, req.scholarId);
     const notableCiters = await invokeTool<AnalysisResult["notableCiters"]>(
@@ -223,6 +233,7 @@ export async function runAnalysisJob(env: Env, jobId: string, req: AnalyzeReques
       topCitedPapers: topCited,
       citingInstitutions: institutions,
       notableCiters,
+      topVenues,
     };
 
     await checkCancel(); // don't clobber a cancel that landed during the last step

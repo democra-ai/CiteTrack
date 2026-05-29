@@ -308,13 +308,51 @@ public class CitationContextService: ObservableObject {
         }
     }
 
-    /// Publication with author info from Semantic Scholar
+    /// Publication with author info (Semantic Scholar / Google Scholar, optionally
+    /// refined with the authoritative complete list from OpenAlex).
     public struct PublicationWithAuthors: Codable, Identifiable {
         public let id: String          // same as PublicationInfo.id
         public let title: String
         public let year: Int?
         public let citationCount: Int?
-        public let authors: [String]   // ordered author names from SS
+        public let authors: [String]   // ordered author names
+
+        /// True when `authors` is the complete, authoritative list (from OpenAlex).
+        /// SS / GS lists are often truncated, so the "last author == corresponding"
+        /// heuristic is only trusted when this is true. Defaults false.
+        public var authorListComplete: Bool
+        /// OpenAlex is_corresponding for the scholar, when known (authoritative).
+        public var correspondingByOpenAlex: Bool?
+
+        public init(
+            id: String,
+            title: String,
+            year: Int?,
+            citationCount: Int?,
+            authors: [String],
+            authorListComplete: Bool = false,
+            correspondingByOpenAlex: Bool? = nil
+        ) {
+            self.id = id
+            self.title = title
+            self.year = year
+            self.citationCount = citationCount
+            self.authors = authors
+            self.authorListComplete = authorListComplete
+            self.correspondingByOpenAlex = correspondingByOpenAlex
+        }
+
+        // Custom decode so older cached entries (without the new keys) still load.
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            title = try c.decode(String.self, forKey: .title)
+            year = try c.decodeIfPresent(Int.self, forKey: .year)
+            citationCount = try c.decodeIfPresent(Int.self, forKey: .citationCount)
+            authors = try c.decodeIfPresent([String].self, forKey: .authors) ?? []
+            authorListComplete = try c.decodeIfPresent(Bool.self, forKey: .authorListComplete) ?? false
+            correspondingByOpenAlex = try c.decodeIfPresent(Bool.self, forKey: .correspondingByOpenAlex)
+        }
 
         /// Strip author name markers (*, †, #, superscripts, etc.) used to denote co-first/corresponding
         private static func stripMarkers(_ name: String) -> (clean: String, hasMarker: Bool) {
@@ -342,6 +380,9 @@ public class CitationContextService: ObservableObject {
             guard !authors.isEmpty else { return .unknown }
             guard !scholarName.isEmpty else { return .unknown }
 
+            // Authoritative signal from OpenAlex wins outright.
+            if correspondingByOpenAlex == true { return .correspondingAuthor }
+
             let count = authors.count
 
             // Parse markers from all authors
@@ -363,29 +404,26 @@ public class CitationContextService: ObservableObject {
             let isFirst = (idx == 0)
             let isLast = (idx == count - 1) && count > 1
 
+            // First author is reliable even on a truncated list — truncation drops
+            // trailing authors, never the lead.
+            if isFirst { return .firstAuthor }
+
             if hasAnyMarkers {
-                // Marker-based detection
-                if isFirst {
-                    return .firstAuthor
-                }
-                if isLast && scholarHasMarker {
-                    // Last author with marker → corresponding
-                    return .correspondingAuthor
-                }
-                if isLast {
-                    // Last author without marker → still typically corresponding
-                    return .correspondingAuthor
-                }
+                // A marker on the last author is an explicit corresponding signal,
+                // trustworthy even when the list is otherwise incomplete.
+                if isLast && scholarHasMarker { return .correspondingAuthor }
                 if scholarHasMarker && idx <= 2 {
                     // Early position with marker → co-first
                     return .coFirstAuthor
                 }
+                // Last without a marker → only trust "corresponding" on a complete list.
+                if isLast { return authorListComplete ? .correspondingAuthor : .middleAuthor }
                 return .middleAuthor
             } else {
-                // No markers — pure position-based
-                if isFirst { return .firstAuthor }
-                if isLast { return .correspondingAuthor }
-                // Without markers, we cannot determine co-first — all others are middle
+                // No markers. Only call the last author "corresponding" when the list
+                // is known complete; otherwise a TRUNCATED middle author would land
+                // last and be mis-labeled corresponding — the reported bug.
+                if isLast { return authorListComplete ? .correspondingAuthor : .middleAuthor }
                 return .middleAuthor
             }
         }

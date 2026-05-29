@@ -1476,9 +1476,7 @@ struct CitingPapersSheetContent: View {
                     VStack(spacing: 0) {
                         // 论文信息头部
                         publicationHeaderView(for: publication)
-                        
-                        Divider()
-                        
+
                         // 引用文章内容
                         if isLoadingCitingPapers {
                             // 加载中：优先显示加载视图
@@ -1580,9 +1578,12 @@ struct CitingPapersSheetContent: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .glassSurface(cornerRadius: 18)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
     }
-    
+
     // MARK: - Citing Papers List
     
     private var citingPapersListView: some View {

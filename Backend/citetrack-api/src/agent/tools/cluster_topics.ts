@@ -29,7 +29,8 @@ async function labelCluster(
   ai: Ai,
   papers: Array<{ title: string; abstract: string | null }>,
   scholarName: string,
-  scholarFieldHint?: string
+  scholarFieldHint?: string,
+  lang: string = "en"
 ): Promise<ClusterLabel> {
   const sample = papers.slice(0, 12);
   const bulletList = sample
@@ -41,13 +42,20 @@ async function labelCluster(
 
   const fieldHint = scholarFieldHint ? ` The cited scholar's field is around: ${scholarFieldHint}.` : "";
 
+  // Generate the human-readable parts in the app's language so the analysis
+  // matches the UI locale (the reported "Research directions not translated").
+  const langDirective =
+    lang === "zh"
+      ? `\n\nWrite "label", "summary", and every "keywords" entry in Simplified Chinese (简体中文). Keep well-known method/model names (e.g. Transformer, BERT) in their original form.`
+      : `\n\nWrite "label", "summary", and "keywords" in English.`;
+
   const prompt = `You are an academic analyst. Below are ${sample.length} research papers that all cite the work of researcher "${scholarName}".${fieldHint} They form one topical cluster.
 
 Papers:
 ${bulletList}
 
 Identify the unifying research direction of this cluster. Reply strictly as compact JSON with this exact shape:
-{"label": "<concise 2-6 word topic label>", "summary": "<one sentence, <=180 chars, explaining the cluster theme>", "keywords": ["<keyword>", "<keyword>", "<keyword>", "<keyword>", "<keyword>"]}
+{"label": "<concise 2-6 word topic label>", "summary": "<one sentence, <=180 chars, explaining the cluster theme>", "keywords": ["<keyword>", "<keyword>", "<keyword>", "<keyword>", "<keyword>"]}${langDirective}
 
 Do not include any text outside the JSON object.`;
 
@@ -207,7 +215,8 @@ export function makeClusterTopicsTool(
   ai: Ai,
   scholarId: string,
   scholarName: string,
-  scholarAffiliation: string | null | undefined
+  scholarAffiliation: string | null | undefined,
+  lang: string = "en"
 ) {
   return tool(
     async ({ maxClusters }: { maxClusters: number }): Promise<ResearchDirection[]> => {
@@ -256,7 +265,8 @@ export function makeClusterTopicsTool(
             ai,
             papers.map((p) => ({ title: p.title, abstract: p.abstract })),
             scholarName,
-            scholarAffiliation ?? undefined
+            scholarAffiliation ?? undefined,
+            lang
           );
           const clusterDbId = await insertTopicCluster(
             db,

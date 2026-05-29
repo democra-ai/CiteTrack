@@ -44,6 +44,8 @@ async function persistClientEnrichment(
        SET openalex_work_id = COALESCE(?, openalex_work_id),
            abstract = COALESCE(?, abstract),
            citation_count = COALESCE(?, citation_count),
+           venue = COALESCE(?, venue),
+           venue_type = COALESCE(?, venue_type),
            enrichment_status = 'enriched',
            enriched_at = ?
        WHERE scholar_id = ? AND id = ?`;
@@ -80,6 +82,8 @@ async function persistClientEnrichment(
         e.openalexWorkId ?? null,
         e.abstract ?? null,
         typeof e.citationCount === "number" ? e.citationCount : null,
+        e.venueName && e.venueName.trim() ? e.venueName.trim().slice(0, 256) : null,
+        e.venueType ?? null,
         nowTs,
         scholarId,
         e.id

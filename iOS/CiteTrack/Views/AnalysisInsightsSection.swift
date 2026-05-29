@@ -45,19 +45,28 @@ struct AnalysisInsightsSection: View {
             }
 
             // Each metric is its own glass card once results exist.
+            // Order (per product): notable citers → top venues → directions →
+            // top-cited → institutions, then the impact-score entry.
             if let analysis {
-                GlassCard { ResearchDirectionsCard(directions: analysis.researchDirections) }
-                GlassCard { TopCitedPapersCard(papers: analysis.topCitedPapers) }
                 GlassCard {
-                    CitingInstitutionsCard(
-                        institutions: analysis.citingInstitutions,
+                    NotableCitersCard(
+                        citers: analysis.notableCiters,
                         enrichedCount: analysis.enrichedPapersCount,
                         totalCount: analysis.citingPapersCount
                     )
                 }
                 GlassCard {
-                    NotableCitersCard(
-                        citers: analysis.notableCiters,
+                    TopVenuesCard(
+                        venues: analysis.topVenues,
+                        enrichedCount: analysis.enrichedPapersCount,
+                        totalCount: analysis.citingPapersCount
+                    )
+                }
+                GlassCard { ResearchDirectionsCard(directions: analysis.researchDirections) }
+                GlassCard { TopCitedPapersCard(papers: analysis.topCitedPapers) }
+                GlassCard {
+                    CitingInstitutionsCard(
+                        institutions: analysis.citingInstitutions,
                         enrichedCount: analysis.enrichedPapersCount,
                         totalCount: analysis.citingPapersCount
                     )
@@ -79,10 +88,10 @@ struct AnalysisInsightsSection: View {
                     .font(.title3)
                     .foregroundStyle(.green)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(lm.localized("haiyou_entry_title", fallback: "海优模拟评分"))
+                    Text(lm.localized("score_impact_title", fallback: "Score your impact"))
                         .font(.subheadline).fontWeight(.semibold)
                         .foregroundStyle(.primary)
-                    Text(lm.localized("haiyou_entry_subtitle", fallback: "按海优五维评审体系给你的影响力打分"))
+                    Text(lm.localized("score_impact_entry_subtitle", fallback: "Rate your academic impact from your citations"))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
@@ -145,7 +154,7 @@ struct AnalysisInsightsSection: View {
         }
         .padding(.vertical, 4)
         .confirmationDialog(
-            lm.localized("analysis_delete_confirm", fallback: "Delete this analysis and 海优 score?"),
+            lm.localized("analysis_delete_confirm", fallback: "Delete this analysis and impact score?"),
             isPresented: $showDeleteConfirm,
             titleVisibility: .visible
         ) {
@@ -303,7 +312,8 @@ struct AnalysisInsightsSection: View {
                 scholar: scholar,
                 publications: publications,
                 citingPapers: analysisPapers,
-                enrichedCitingPapers: enriched.isEmpty ? nil : enriched
+                enrichedCitingPapers: enriched.isEmpty ? nil : enriched,
+                lang: lm.currentLanguage == .chinese ? "zh" : "en"
             )
         } catch {
             loadError = error.localizedDescription
@@ -637,6 +647,75 @@ private struct NotableCitersCard: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Card: Top venues
+
+private struct TopVenuesCard: View {
+    let venues: [TopVenue]
+    let enrichedCount: Int
+    let totalCount: Int
+    private let lm = LocalizationManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionTitle(
+                lm.localized("analysis_card_venues", fallback: "Top Venues Citing You"),
+                icon: "books.vertical",
+                count: venues.count
+            )
+            if venues.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lm.localized("analysis_card_empty", fallback: "—"))
+                        .font(.caption).foregroundColor(.secondary)
+                    if enrichedCount == 0 && totalCount > 0 {
+                        Text(
+                            lm.localized(
+                                "analysis_venues_unavailable",
+                                fallback: "Venues appear once citing papers are matched to OpenAlex."
+                            )
+                        )
+                        .font(.caption2).foregroundColor(.orange)
+                    }
+                }
+            } else {
+                ForEach(venues.prefix(15)) { v in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("\(v.paperCount)")
+                            .font(.caption.monospacedDigit())
+                            .fontWeight(.semibold)
+                            .foregroundColor(.teal)
+                            .frame(minWidth: 30, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(v.name).font(.subheadline).lineLimit(2)
+                            HStack(spacing: 6) {
+                                if let t = v.type, !t.isEmpty {
+                                    Text(venueTypeLabel(t))
+                                        .font(.caption2).foregroundColor(.secondary)
+                                }
+                                if v.totalCitations > 0 {
+                                    Text(String(format: lm.localized("analysis_citedby_n", fallback: "%d total citations"), v.totalCitations))
+                                        .font(.caption2).foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func venueTypeLabel(_ raw: String) -> String {
+        switch raw.lowercased() {
+        case "journal": return lm.localized("venue_type_journal", fallback: "Journal")
+        case "conference": return lm.localized("venue_type_conference", fallback: "Conference")
+        case "repository": return lm.localized("venue_type_repository", fallback: "Repository")
+        case "book series", "book": return lm.localized("venue_type_book", fallback: "Book series")
+        default: return raw.capitalized
+        }
     }
 }
 

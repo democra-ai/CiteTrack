@@ -52,6 +52,8 @@ const enrichedCitingPaperSchema = z.object({
   abstract: z.string().max(16384).nullable().optional(),
   citationCount: z.number().int().nullable().optional(),
   authors: z.array(enrichedAuthorSchema).max(100).default([]),
+  venueName: z.string().max(256).nullable().optional(),
+  venueType: z.string().max(64).nullable().optional(),
 });
 
 const analyzeBody = z.object({
@@ -71,6 +73,7 @@ const analyzeBody = z.object({
     .default([]),
   citingPapers: z.array(citingPaperSchema).min(1).max(2000),
   enrichedCitingPapers: z.array(enrichedCitingPaperSchema).max(2000).optional(),
+  lang: z.string().max(8).nullable().optional(),
 });
 
 export function makeAnalyzeRouter() {
@@ -125,7 +128,10 @@ export function makeAnalyzeRouter() {
               type: i.type ?? null,
             })),
           })),
+          venueName: e.venueName ?? null,
+          venueType: e.venueType ?? null,
         })),
+        lang: result.data.lang ?? null,
       };
     } catch (e) {
       return c.json({ error: "bad_json", detail: String(e) }, 400);

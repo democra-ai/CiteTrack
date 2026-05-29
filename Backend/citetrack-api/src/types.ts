@@ -45,6 +45,9 @@ export interface EnrichedCitingPaperInput {
   abstract?: string | null;
   citationCount?: number | null;
   authors: EnrichedAuthorInput[];
+  /// Venue (journal / conference / repository) from OpenAlex primary_location.source.
+  venueName?: string | null;
+  venueType?: string | null;
 }
 
 export interface AnalyzeRequest {
@@ -62,6 +65,9 @@ export interface AnalyzeRequest {
   /// shared with thousands of CF customers) and pass the enriched data through.
   /// When provided, the worker skips its own OpenAlex calls for these papers.
   enrichedCitingPapers?: EnrichedCitingPaperInput[];
+  /// UI language ("en" | "zh"). Research-direction labels/summaries/keywords are
+  /// generated in this language so the analysis matches the app's locale.
+  lang?: string | null;
 }
 
 export type JobStatus = "pending" | "running" | "done" | "error" | "cancelled";
@@ -119,6 +125,13 @@ export interface NotableCiter {
   examplePapers: Array<{ id: string; title: string }>;
 }
 
+export interface TopVenue {
+  name: string;
+  type: string | null; // journal | conference | repository | ...
+  paperCount: number;
+  totalCitations: number;
+}
+
 export interface AnalysisResult {
   scholarId: string;
   generatedAt: number;
@@ -128,6 +141,7 @@ export interface AnalysisResult {
   topCitedPapers: TopCitedPaper[];
   citingInstitutions: CitingInstitution[];
   notableCiters: NotableCiter[];
+  topVenues: TopVenue[];
 }
 
 // ---- 海优 (Overseas Excellent Young Scientists) simulated scoring ----

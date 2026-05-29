@@ -3405,36 +3405,9 @@ struct ScholarChartDetailView: View {
                     statisticsView
                 }
                 .padding()
-                .coordinateSpace(name: "chartSpace")
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 10)
-                        .onChanged { value in
-                            if outerDragStartLocation == nil {
-                                outerDragStartLocation = value.startLocation
-                            }
-                        }
-                        .onEnded { value in
-                            defer { outerDragStartLocation = nil }
-                            // 仅在未选中数据点时处理左右切换，避免与图表手势冲突
-                            let start = outerDragStartLocation ?? value.startLocation
-                            let startedInsideChart = chartFrame.contains(start)
-                            // 若在图表外开始滑动，则无论是否选中数据点都允许切换
-                            if selectedDataPoint != nil && startedInsideChart {
-                                return
-                            }
-                            let dx = value.translation.width
-                            let dy = value.translation.height
-                            // 加强水平滑动判定，避免与纵向滚动冲突
-                            guard abs(dx) > abs(dy) * 1.2, abs(dx) > 60 else { return }
-                            if dx < 0 {
-                                moveTimeRangeSelection(offset: 1)
-                            } else {
-                                moveTimeRangeSelection(offset: -1)
-                            }
-                            let impact = UIImpactFeedbackGenerator(style: .light)
-                            impact.impactOccurred()
-                        }
-                )
+                // The page scrolls vertically; range switching is via the segmented
+                // Picker. (A previous outer swipe-gesture here intercepted vertical
+                // drags and blocked the ScrollView.)
             }
             .liquidGlassCanvas()
             .navigationTitle(localizationManager.localized("citation_trend"))
@@ -3514,8 +3487,7 @@ struct ScholarChartDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .glassSurface(cornerRadius: 20)
     }
     
     private var timeRangeSelector: some View {
@@ -3549,8 +3521,7 @@ struct ScholarChartDetailView: View {
                     Spacer()
                 }
                 .frame(height: 160)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
+                .glassSurface(cornerRadius: 16)
             } else if chartData.isEmpty {
                 // 空数据状态
                 HStack {
@@ -3566,8 +3537,7 @@ struct ScholarChartDetailView: View {
                     Spacer()
                 }
                 .frame(height: 160)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
+                .glassSurface(cornerRadius: 16)
             } else {
                 // 实际图表
                 GeometryReader { geometry in
@@ -3727,9 +3697,7 @@ struct ScholarChartDetailView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .glassSurface(cornerRadius: 20)
                     .onAppear {
                         chartFrame = geometry.frame(in: .named("chartSpace"))
                     }
@@ -3789,8 +3757,7 @@ struct ScholarChartDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .glassSurface(cornerRadius: 20)
     }
     
     private func calculatePeriodChange(periodDays: Int) -> (change: Int, growth: Double) {
@@ -3902,8 +3869,7 @@ struct ScholarChartDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .glassSurface(cornerRadius: 20)
     }
     
     private func findClosestDataPoint(to point: CGPoint, in geometry: GeometryProxy) -> ChartDataPoint? {

@@ -12,10 +12,11 @@ public struct AnalysisResult: Codable, Hashable {
     public let topCitedPapers: [TopCitedPaper]
     public let citingInstitutions: [CitingInstitution]
     public let notableCiters: [NotableCiter]
+    public let topVenues: [TopVenue]
 
     private enum CodingKeys: String, CodingKey {
         case scholarId, generatedAt, citingPapersCount, enrichedPapersCount
-        case researchDirections, topCitedPapers, citingInstitutions, notableCiters
+        case researchDirections, topCitedPapers, citingInstitutions, notableCiters, topVenues
     }
 
     public init(from decoder: Decoder) throws {
@@ -29,6 +30,7 @@ public struct AnalysisResult: Codable, Hashable {
         topCitedPapers = try c.decodeIfPresent([TopCitedPaper].self, forKey: .topCitedPapers) ?? []
         citingInstitutions = try c.decodeIfPresent([CitingInstitution].self, forKey: .citingInstitutions) ?? []
         notableCiters = try c.decodeIfPresent([NotableCiter].self, forKey: .notableCiters) ?? []
+        topVenues = try c.decodeIfPresent([TopVenue].self, forKey: .topVenues) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -41,7 +43,16 @@ public struct AnalysisResult: Codable, Hashable {
         try c.encode(topCitedPapers, forKey: .topCitedPapers)
         try c.encode(citingInstitutions, forKey: .citingInstitutions)
         try c.encode(notableCiters, forKey: .notableCiters)
+        try c.encode(topVenues, forKey: .topVenues)
     }
+}
+
+public struct TopVenue: Codable, Hashable, Identifiable {
+    public let name: String
+    public let type: String?       // journal | conference | repository | ...
+    public let paperCount: Int
+    public let totalCitations: Int
+    public var id: String { name }
 }
 
 public struct ResearchDirection: Codable, Hashable, Identifiable {

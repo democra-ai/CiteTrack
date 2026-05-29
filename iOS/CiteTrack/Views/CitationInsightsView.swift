@@ -22,6 +22,7 @@ struct CitationInsightsView: View {
     @State private var selectedPubIds: Set<String> = []
     @State private var showPublicationPicker = false
     @State private var isFetchingAuthors = false
+    @State private var isRefiningRoles = false
     @State private var loadError: String?
     @State private var hasAuthorInfo = false
     @State private var pickerRoleFilter: CitationContextService.AuthorRole? = nil
@@ -208,10 +209,13 @@ struct CitationInsightsView: View {
                 selectedPubIds = Set(merged.map { $0.id })
             }
 
-            // If still too many missing, force fresh fetch from GS
+            // If still too many missing, force fresh fetch from GS; otherwise refine
+            // author roles via OpenAlex (authoritative complete author lists).
             let withAuthors = merged.filter { !$0.authors.isEmpty }.count
             if withAuthors < merged.count / 2 {
                 fetchFreshAuthorsFromGS(scholarId)
+            } else {
+                refineRolesViaOpenAlex(scholarId: scholarId, scholarName: selectedScholarName)
             }
             return
         }
@@ -228,10 +232,12 @@ struct CitationInsightsView: View {
             hasAuthorInfo = gsPubs.contains { !$0.authors.isEmpty }
             selectedPubIds = Set(mapped.map { $0.id })
 
-            // If many authors missing, force fresh fetch
+            // If many authors missing, force fresh fetch; otherwise refine roles via OpenAlex.
             let withAuthors = mapped.filter { !$0.authors.isEmpty }.count
             if withAuthors < mapped.count / 2 {
                 fetchFreshAuthorsFromGS(scholarId)
+            } else {
+                refineRolesViaOpenAlex(scholarId: scholarId, scholarName: selectedScholarName)
             }
             return
         }
@@ -285,6 +291,47 @@ struct CitationInsightsView: View {
 
                 // Save to PubAuthors cache for next session
                 contextService.savePublicationAuthors(mapped, forScholar: scholarId)
+                // Refine GS author lists with authoritative OpenAlex data.
+                refineRolesViaOpenAlex(scholarId: scholarId, scholarName: selectedScholarName)
+            }
+        }
+    }
+
+    /// Refine author roles using OpenAlex (authoritative complete author lists +
+    /// author_position / is_corresponding). Fixes the case where a TRUNCATED
+    /// Semantic Scholar / Google Scholar list made a middle author look "last" and
+    /// get mis-labeled corresponding. Runs in the background; results are cached.
+    private func refineRolesViaOpenAlex(scholarId: String, scholarName: String) {
+        guard !scholarName.isEmpty, !isRefiningRoles else { return }
+        let pending = publicationsWithAuthors.filter { !$0.authorListComplete }
+        guard !pending.isEmpty else { return }
+        isRefiningRoles = true
+        Task {
+            defer { Task { @MainActor in isRefiningRoles = false } }
+            // Bound the number of OpenAlex lookups per pass; results persist so
+            // subsequent sessions skip already-refined publications.
+            for pub in pending.prefix(60) {
+                guard let resolved = await OpenAlexEnrichmentClient.shared.resolveOwnAuthorship(
+                    title: pub.title, year: pub.year, scholarName: scholarName
+                ) else { continue }
+                let refined = CitationContextService.PublicationWithAuthors(
+                    id: pub.id,
+                    title: pub.title,
+                    year: pub.year,
+                    citationCount: pub.citationCount,
+                    authors: resolved.authorNames.isEmpty ? pub.authors : resolved.authorNames,
+                    authorListComplete: !resolved.authorNames.isEmpty,
+                    correspondingByOpenAlex: resolved.matchedIndex != nil ? resolved.isCorresponding : nil
+                )
+                await MainActor.run {
+                    if let i = publicationsWithAuthors.firstIndex(where: { $0.id == pub.id }) {
+                        publicationsWithAuthors[i] = refined
+                    }
+                }
+            }
+            await MainActor.run {
+                hasAuthorInfo = publicationsWithAuthors.contains { !$0.authors.isEmpty }
+                contextService.savePublicationAuthors(publicationsWithAuthors, forScholar: scholarId)
             }
         }
     }
