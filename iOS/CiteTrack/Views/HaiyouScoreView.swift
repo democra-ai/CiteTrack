@@ -72,6 +72,7 @@ struct HaiyouScoreView: View {
                 }
             }
         }
+        .liquidGlassCanvas()
         .navigationTitle(lm.localized("haiyou_title", fallback: "海优模拟评分"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showInputSheet) {
@@ -319,6 +320,7 @@ private struct HaiyouInputSheet: View {
                     }
                 }
             }
+            .liquidGlassCanvas()
             .navigationTitle(lm.localized("haiyou_inputs_title", fallback: "补充材料"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

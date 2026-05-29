@@ -37,65 +37,109 @@ async function persistClientEnrichment(
 
   const seenAuthorKeys = new Set<string>();
   const seenInstKeys = new Set<string>();
+  const stmts: D1PreparedStatement[] = [];
+  const nowTs = Date.now();
 
+  const paperEnrichSQL = `UPDATE citing_papers
+       SET openalex_work_id = COALESCE(?, openalex_work_id),
+           abstract = COALESCE(?, abstract),
+           citation_count = COALESCE(?, citation_count),
+           enrichment_status = 'enriched',
+           enriched_at = ?
+       WHERE scholar_id = ? AND id = ?`;
+  const authorSQL = `INSERT INTO authors (id, display_name, openalex_id, orcid, h_index, works_count, cited_by_count, is_notable, last_enriched_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         display_name=excluded.display_name,
+         openalex_id=COALESCE(excluded.openalex_id, authors.openalex_id),
+         orcid=COALESCE(excluded.orcid, authors.orcid),
+         h_index=COALESCE(excluded.h_index, authors.h_index),
+         works_count=COALESCE(excluded.works_count, authors.works_count),
+         cited_by_count=COALESCE(excluded.cited_by_count, authors.cited_by_count),
+         is_notable=excluded.is_notable,
+         last_enriched_at=excluded.last_enriched_at`;
+  const linkPaperAuthorSQL = `INSERT OR IGNORE INTO paper_authors (scholar_id, citing_paper_id, author_id, position) VALUES (?, ?, ?, ?)`;
+  const instSQL = `INSERT INTO institutions (id, display_name, openalex_id, ror_id, country_code, type)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         display_name=excluded.display_name,
+         openalex_id=COALESCE(excluded.openalex_id, institutions.openalex_id),
+         ror_id=COALESCE(excluded.ror_id, institutions.ror_id),
+         country_code=COALESCE(excluded.country_code, institutions.country_code),
+         type=COALESCE(excluded.type, institutions.type)`;
+  const linkAuthorInstSQL = `INSERT OR IGNORE INTO author_institutions (author_id, institution_id) VALUES (?, ?)`;
+
+  // Build all statements once, then run them in batches. The previous version awaited
+  // every INSERT/UPDATE one at a time — thousands of sequential D1 round-trips that
+  // dominated the job time and made large analyses time out. db.batch() ships a whole
+  // chunk per round-trip. Statement order keeps author/institution rows before the
+  // link rows that reference them, so FK constraints hold across chunks.
   for (const e of enriched) {
-    try {
-      await setCitingPaperEnrichment(
-        db,
-        scholarId,
-        e.id,
+    stmts.push(
+      db.prepare(paperEnrichSQL).bind(
         e.openalexWorkId ?? null,
         e.abstract ?? null,
-        typeof e.citationCount === "number" ? e.citationCount : null
-      );
-    } catch (err) {
-      console.error("[enrich:client] setCitingPaperEnrichment failed", e.id, err instanceof Error ? err.message : String(err));
-      continue;
-    }
+        typeof e.citationCount === "number" ? e.citationCount : null,
+        nowTs,
+        scholarId,
+        e.id
+      )
+    );
 
     for (let pos = 0; pos < (e.authors ?? []).length; pos++) {
       const a = e.authors[pos];
       const aKey = normalizeAuthorKey(a.displayName, a.openalexId);
-
-      try {
-        await upsertAuthor(db, {
-          id: aKey,
-          displayName: a.displayName,
-          openalexId: a.openalexId ?? null,
-          orcid: a.orcid ?? null,
-          hIndex: typeof a.hIndex === "number" ? a.hIndex : null,
-          worksCount: typeof a.worksCount === "number" ? a.worksCount : null,
-          citedByCount: typeof a.citedByCount === "number" ? a.citedByCount : null,
-          isNotable: (a.hIndex ?? 0) >= NOTABLE_H_INDEX,
-        });
+      if (!seenAuthorKeys.has(aKey)) {
         seenAuthorKeys.add(aKey);
-        await linkPaperAuthor(db, e.id, aKey, pos, scholarId);
-      } catch (err) {
-        console.error("[enrich:client] upsertAuthor/linkPaperAuthor failed", aKey, err instanceof Error ? err.message : String(err));
-        continue;
+        stmts.push(
+          db.prepare(authorSQL).bind(
+            aKey,
+            a.displayName,
+            a.openalexId ?? null,
+            a.orcid ?? null,
+            typeof a.hIndex === "number" ? a.hIndex : null,
+            typeof a.worksCount === "number" ? a.worksCount : null,
+            typeof a.citedByCount === "number" ? a.citedByCount : null,
+            (a.hIndex ?? 0) >= NOTABLE_H_INDEX ? 1 : 0,
+            nowTs
+          )
+        );
       }
+      stmts.push(db.prepare(linkPaperAuthorSQL).bind(scholarId, e.id, aKey, pos));
 
       for (const inst of a.institutions ?? []) {
         if (!inst.displayName) continue;
         const iKey = normalizeInstKey(inst.displayName, inst.openalexId);
-        try {
-          if (!seenInstKeys.has(iKey)) {
-            seenInstKeys.add(iKey);
-            await upsertInstitution(db, {
-              id: iKey,
-              displayName: inst.displayName,
-              openalexId: inst.openalexId ?? null,
-              rorId: inst.rorId ?? null,
-              countryCode: inst.countryCode ?? null,
-              type: inst.type ?? null,
-            });
-          }
-          await linkAuthorInstitution(db, aKey, iKey);
-        } catch (err) {
-          console.error("[enrich:client] institution upsert/link failed", iKey, err instanceof Error ? err.message : String(err));
+        if (!seenInstKeys.has(iKey)) {
+          seenInstKeys.add(iKey);
+          stmts.push(
+            db.prepare(instSQL).bind(
+              iKey,
+              inst.displayName,
+              inst.openalexId ?? null,
+              inst.rorId ?? null,
+              inst.countryCode ?? null,
+              inst.type ?? null
+            )
+          );
         }
+        stmts.push(db.prepare(linkAuthorInstSQL).bind(aKey, iKey));
       }
     }
+  }
+
+  const CHUNK = 50;
+  for (let i = 0; i < stmts.length; i += CHUNK) {
+    try {
+      await db.batch(stmts.slice(i, i + CHUNK));
+    } catch (err) {
+      console.error("[enrich:client] batch failed", err instanceof Error ? err.message : String(err));
+    }
+    const done = Math.min(i + CHUNK, stmts.length);
+    await onProgress?.(
+      `Storing… ${done}/${stmts.length}`,
+      20 + Math.floor((done / Math.max(stmts.length, 1)) * 40)
+    );
   }
 
   await onProgress?.(`Stored ${enriched.length} enriched papers`, 60);

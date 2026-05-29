@@ -26,11 +26,11 @@ struct GoogleSignInView: View {
 
                 // Title + subtitle
                 VStack(spacing: 8) {
-                    Text("See How You're Cited")
+                    Text("signin_headline".localized)
                         .font(.title2)
                         .fontWeight(.bold)
 
-                    Text("Sign in with Google to unlock verbatim citation context — the exact sentences where your work is referenced.")
+                    Text("signin_subtitle".localized)
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -71,7 +71,7 @@ struct GoogleSignInView: View {
 
                 Spacer().frame(height: 24)
 
-                Button("Maybe Later") { dismiss() }
+                Button("signin_maybe_later".localized) { dismiss() }
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
@@ -124,7 +124,7 @@ struct GoogleSignInButton: View {
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(Color(red: 0.26, green: 0.52, blue: 0.96))
                 }
-                Text("Continue with Google")
+                Text("signin_continue_google".localized)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
             }

@@ -26,57 +26,75 @@ struct AnalysisInsightsSection: View {
     private let lm = LocalizationManager.shared
 
     var body: some View {
-        Section {
-            header
-            if let err = loadError {
-                Label(err, systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundColor(.orange)
-            }
-            if let notice = pendingNotice {
-                pendingNoticeRow(notice)
-            }
-            if let analysis {
-                ResearchDirectionsCard(directions: analysis.researchDirections)
-                TopCitedPapersCard(papers: analysis.topCitedPapers)
-                CitingInstitutionsCard(
-                    institutions: analysis.citingInstitutions,
-                    enrichedCount: analysis.enrichedPapersCount,
-                    totalCount: analysis.citingPapersCount
-                )
-                NotableCitersCard(
-                    citers: analysis.notableCiters,
-                    enrichedCount: analysis.enrichedPapersCount,
-                    totalCount: analysis.citingPapersCount
-                )
-                NavigationLink {
-                    HaiyouScoreView(scholarId: scholar.id, scholarName: scholar.name)
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundColor(.green)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(lm.localized("haiyou_entry_title", fallback: "海优模拟评分"))
-                                .font(.subheadline).fontWeight(.semibold)
-                            Text(lm.localized("haiyou_entry_subtitle", fallback: "按海优五维评审体系给你的影响力打分"))
-                                .font(.caption2).foregroundColor(.secondary)
-                        }
+        VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+            // Header + run-state in one glass card.
+            GlassCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    header
+                    if let err = loadError {
+                        Label(err, systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundColor(.orange)
                     }
-                    .padding(.vertical, 4)
+                    if let notice = pendingNotice {
+                        pendingNoticeRow(notice)
+                    }
+                    if analysis == nil {
+                        if isRunning { progressRow } else { emptyRow }
+                    }
                 }
-            } else if isRunning {
-                progressRow
-            } else {
-                emptyRow
             }
-        } header: {
-            Text(lm.localized("analysis_section_header", fallback: "AI Analysis"))
-                .textCase(.uppercase)
-                .font(.caption)
-                .foregroundColor(.secondary)
+
+            // Each metric is its own glass card once results exist.
+            if let analysis {
+                GlassCard { ResearchDirectionsCard(directions: analysis.researchDirections) }
+                GlassCard { TopCitedPapersCard(papers: analysis.topCitedPapers) }
+                GlassCard {
+                    CitingInstitutionsCard(
+                        institutions: analysis.citingInstitutions,
+                        enrichedCount: analysis.enrichedPapersCount,
+                        totalCount: analysis.citingPapersCount
+                    )
+                }
+                GlassCard {
+                    NotableCitersCard(
+                        citers: analysis.notableCiters,
+                        enrichedCount: analysis.enrichedPapersCount,
+                        totalCount: analysis.citingPapersCount
+                    )
+                }
+                haiyouEntryCard
+            }
         }
         .task(id: scholar.id) {
             await loadCachedIfAvailable()
         }
+    }
+
+    private var haiyouEntryCard: some View {
+        NavigationLink {
+            HaiyouScoreView(scholarId: scholar.id, scholarName: scholar.name)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.title3)
+                    .foregroundStyle(.green)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(lm.localized("haiyou_entry_title", fallback: "海优模拟评分"))
+                        .font(.subheadline).fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                    Text(lm.localized("haiyou_entry_subtitle", fallback: "按海优五维评审体系给你的影响力打分"))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(GlassMetrics.cardPadding)
+            .glassSurface(tint: .green)
+        }
+        .buttonStyle(.plain)
     }
 
     private var header: some View {
@@ -248,6 +266,11 @@ struct AnalysisInsightsSection: View {
             loadError = lm.localized("analysis_no_citing", fallback: "No citing papers loaded.")
             return
         }
+        // Cap the set sent for AI analysis. On-device OpenAlex enrichment and the worker's
+        // embedding/clustering both scale with paper count; a very large set blows past the
+        // Cloudflare worker's wall-time so the job never finishes and the poll times out.
+        // The top slice is a representative sample for directions / top-cited / institutions / citers.
+        let analysisPapers = Array(citingPapers.prefix(200))
         isRunning = true
         loadError = nil
         pendingNotice = nil
@@ -260,8 +283,8 @@ struct AnalysisInsightsSection: View {
         }
 
         let enriched = await OpenAlexEnrichmentClient.shared.enrich(
-            citingPapers: citingPapers,
-            concurrency: 4,
+            citingPapers: analysisPapers,
+            concurrency: 6,
             progress: { completed, total in
                 Task { @MainActor in
                     let fmt = self.lm.localized("analysis_enrich_progress", fallback: "OpenAlex %d / %d")
@@ -279,7 +302,7 @@ struct AnalysisInsightsSection: View {
             jobId = try await CiteTrackAnalysisService.shared.startAnalysis(
                 scholar: scholar,
                 publications: publications,
-                citingPapers: citingPapers,
+                citingPapers: analysisPapers,
                 enrichedCitingPapers: enriched.isEmpty ? nil : enriched
             )
         } catch {
@@ -425,25 +448,14 @@ private struct ResearchDirectionsCard: View {
                         HStack {
                             Text(d.label).font(.subheadline).fontWeight(.semibold)
                             Spacer()
-                            Text("\(d.paperCount)")
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.secondary.opacity(0.15))
-                                .clipShape(Capsule())
+                            GlassChip(text: "\(d.paperCount)", tint: .secondary)
                         }
                         if !d.summary.isEmpty {
                             Text(d.summary).font(.caption).foregroundColor(.secondary)
                         }
                         if !d.keywords.isEmpty {
                             FlowLayout(items: d.keywords) { kw in
-                                Text(kw)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.blue.opacity(0.12))
-                                    .foregroundColor(.blue)
-                                    .clipShape(Capsule())
+                                GlassChip(text: kw, tint: .blue)
                             }
                         }
                     }

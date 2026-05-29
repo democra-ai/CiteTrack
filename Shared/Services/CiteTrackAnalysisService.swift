@@ -81,27 +81,43 @@ public final class CiteTrackAnalysisService {
     ) async throws -> String {
         guard !citingPapers.isEmpty else { throw AnalysisServiceError.noCitingPapers }
 
+        // Sanitize to satisfy the worker's validation schema and avoid HTTP 400:
+        // citingPapers must be 1...2000, each with a non-empty id+title, ≤50 authors,
+        // and bounded string lengths. Real Semantic-Scholar data routinely exceeds
+        // these (e.g. papers with 100+ authors), which previously 400'd the request.
+        let safeCiting: [AnalyzeRequestBody.CitingPaperPayload] = citingPapers
+            .filter { !$0.id.isEmpty && !$0.title.isEmpty }
+            .prefix(2000)
+            .map { cp in
+                AnalyzeRequestBody.CitingPaperPayload(
+                    id: String(cp.id.prefix(128)),
+                    title: String(cp.title.prefix(2048)),
+                    authors: cp.authors.prefix(50).map { String($0.prefix(256)) },
+                    year: cp.year,
+                    venue: cp.venue.map { String($0.prefix(256)) },
+                    citationCount: cp.citationCount,
+                    abstract: cp.abstract.map { String($0.prefix(8192)) },
+                    scholarUrl: cp.scholarUrl.map { String($0.prefix(2048)) },
+                    pdfUrl: cp.pdfUrl.map { String($0.prefix(2048)) }
+                )
+            }
+        guard !safeCiting.isEmpty else { throw AnalysisServiceError.noCitingPapers }
+
+        let trimmedName = scholar.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = AnalyzeRequestBody(
-            scholarId: scholar.id,
-            scholarName: scholar.name,
+            scholarId: String(scholar.id.prefix(128)),
+            scholarName: trimmedName.isEmpty ? scholar.id : String(trimmedName.prefix(256)),
             scholarAffiliation: nil,
-            publications: publications.map {
-                .init(id: $0.id, title: $0.title, year: $0.year, citationCount: $0.citationCount)
-            },
-            citingPapers: citingPapers.map {
-                .init(
-                    id: $0.id,
-                    title: $0.title,
-                    authors: $0.authors,
-                    year: $0.year,
-                    venue: $0.venue,
-                    citationCount: $0.citationCount,
-                    abstract: $0.abstract,
-                    scholarUrl: $0.scholarUrl,
-                    pdfUrl: $0.pdfUrl
+            publications: publications.prefix(500).map { (p: ScholarPublication) -> AnalyzeRequestBody.Publication in
+                AnalyzeRequestBody.Publication(
+                    id: String(p.id.prefix(128)),
+                    title: String(p.title.prefix(2048)),
+                    year: p.year,
+                    citationCount: p.citationCount
                 )
             },
-            enrichedCitingPapers: enrichedCitingPapers
+            citingPapers: safeCiting,
+            enrichedCitingPapers: sanitizeEnriched(enrichedCitingPapers)
         )
 
         var req = try makeRequest(path: "/v1/analyze", method: "POST")
@@ -114,6 +130,39 @@ public final class CiteTrackAnalysisService {
             return decoded.jobId
         } catch {
             throw AnalysisServiceError.decode(String(describing: error))
+        }
+    }
+
+    /// Cap enriched data to the worker's schema limits (≤2000 papers, ≤100 authors/paper,
+    /// ≤10 institutions/author, bounded strings) so it never trips validation → HTTP 400.
+    private func sanitizeEnriched(_ enriched: [EnrichedCitingPaper]?) -> [EnrichedCitingPaper]? {
+        guard let enriched, !enriched.isEmpty else { return enriched }
+        return enriched.prefix(2000).map { p in
+            EnrichedCitingPaper(
+                id: String(p.id.prefix(128)),
+                openalexWorkId: p.openalexWorkId,
+                abstract: p.abstract.map { String($0.prefix(16384)) },
+                citationCount: p.citationCount,
+                authors: p.authors.prefix(100).map { a in
+                    EnrichedAuthor(
+                        displayName: String(a.displayName.prefix(256)),
+                        openalexId: a.openalexId,
+                        orcid: a.orcid,
+                        hIndex: a.hIndex,
+                        citedByCount: a.citedByCount,
+                        worksCount: a.worksCount,
+                        institutions: a.institutions.prefix(10).map { i in
+                            EnrichedInstitution(
+                                openalexId: i.openalexId,
+                                rorId: i.rorId,
+                                displayName: String(i.displayName.prefix(512)),
+                                countryCode: i.countryCode,
+                                type: i.type
+                            )
+                        }
+                    )
+                }
+            )
         }
     }
 

@@ -25,6 +25,23 @@ struct CitationInsightsView: View {
     @State private var loadError: String?
     @State private var hasAuthorInfo = false
     @State private var pickerRoleFilter: CitationContextService.AuthorRole? = nil
+    @State private var showClearAllConfirm = false
+
+    /// Localization shortcut — all keys are registered (en+zh) in LocalizationManager.
+    private func L(_ key: String) -> String { LocalizationManager.shared.localized(key) }
+    private func L(_ key: String, _ args: CVarArg...) -> String {
+        String(format: LocalizationManager.shared.localized(key), arguments: args)
+    }
+    /// Localized author-role name (model enum's displayName is English-only).
+    private func roleName(_ role: CitationContextService.AuthorRole) -> String {
+        switch role {
+        case .firstAuthor: return L("role_first")
+        case .coFirstAuthor: return L("role_co_first")
+        case .correspondingAuthor: return L("role_corresponding")
+        case .middleAuthor: return L("role_middle")
+        case .unknown: return L("role_unknown")
+        }
+    }
 
     var body: some View {
         NavigationView {
@@ -35,7 +52,7 @@ struct CitationInsightsView: View {
                     signInGate
                 }
             }
-            .navigationTitle("Citation Insights")
+            .navigationTitle(L("insights_title"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -127,9 +144,14 @@ struct CitationInsightsView: View {
         return Array(byId.values)
     }
 
-    /// IDs of publications that have already been analyzed and saved
+    /// IDs of publications considered "done": only successfully fetched ones, or
+    /// papers definitively not indexed on Semantic Scholar. Rate-limited and error
+    /// results are transient, so they stay OUT of this set and remain retryable —
+    /// tapping "Analyze" again will re-fetch them.
     private var alreadyAnalyzedIds: Set<String> {
-        Set(publicationResults.map { $0.id })
+        Set(publicationResults
+            .filter { $0.fetchStatus == .success || $0.fetchStatus == .notFoundOnSS }
+            .map { $0.id })
     }
 
     /// Number of selected publications not yet analyzed
@@ -282,12 +304,12 @@ struct CitationInsightsView: View {
                     LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
                 )
             VStack(spacing: 8) {
-                Text("Citation Insights")
+                Text(L("insights_title"))
                     .font(.title2).fontWeight(.bold)
-                Text("See how others cite your work")
+                Text(L("insights_signin_subtitle"))
                     .font(.subheadline).foregroundColor(.secondary)
             }
-            Text("Discover how researchers worldwide cite your work — see the exact passages where your papers are referenced.")
+            Text(L("insights_signin_desc"))
                 .font(.body).foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
@@ -302,79 +324,130 @@ struct CitationInsightsView: View {
     // MARK: - Main Content
 
     private var insightsBody: some View {
-        List {
-            // 1. Scholar picker
-            Section {
-                scholarPicker
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: GlassMetrics.cardSpacing) {
+                // 1. Scholar picker
+                GlassCard { scholarPicker }
 
-            // 2. Publication selection + Analyze (one section)
-            Section {
-                publicationSelectionRow
-            }
+                // 2. Publication selection + Analyze
+                GlassCard { publicationSelectionRow }
 
-            // 3. Progress (when running)
-            if contextService.batchProgress.isRunning {
-                Section {
-                    progressView
-                }
-            }
-
-            // 4. Results — per-publication drill-down (show all ever-analyzed publications)
-            if hasFetched && !contextService.batchProgress.isRunning {
-                Section {
-                    summaryCard
+                // 3. Progress (when running)
+                if contextService.batchProgress.isRunning {
+                    GlassCard { progressView }
                 }
 
-                if let scholar = currentScholar, !citingPapersForAnalysis.isEmpty {
-                    AnalysisInsightsSection(
-                        scholar: scholar,
-                        publications: publicationsForAnalysis,
-                        citingPapers: citingPapersForAnalysis
-                    )
+                // 4. Results — summary + AI analysis + per-publication drill-down
+                if hasFetched && !contextService.batchProgress.isRunning {
+                    GlassCard { summaryCard }
+
+                    if let scholar = currentScholar, !citingPapersForAnalysis.isEmpty {
+                        AnalysisInsightsSection(
+                            scholar: scholar,
+                            publications: publicationsForAnalysis,
+                            citingPapers: citingPapersForAnalysis
+                        )
+                    }
+
+                    publicationsCard
+
+                    if !contextService.batchProgress.errors.isEmpty {
+                        issuesCard
+                    }
+                }
+            }
+            .padding(GlassMetrics.screenPadding)
+        }
+        .liquidGlassCanvas()
+        .confirmationDialog(
+            LocalizationManager.shared.localized("insights_clear_all_confirm", fallback: "清空所有已分析的论文？海优评分也会一并删除。"),
+            isPresented: $showClearAllConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(LocalizationManager.shared.localized("insights_clear_all", fallback: "清空"), role: .destructive) {
+                clearAllPublicationResults()
+            }
+            Button(LocalizationManager.shared.localized("cancel", fallback: "取消"), role: .cancel) {}
+        }
+    }
+
+    // Your Publications — a glass card with per-row navigation + an explicit delete
+    // button (swipe-to-delete is List-only; this view is now a ScrollView).
+    private var publicationsCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(L("insights_your_publications", publicationResults.count))
+                        .font(.footnote.weight(.semibold)).textCase(.uppercase)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if !publicationResults.isEmpty {
+                        Button(role: .destructive) {
+                            showClearAllConfirm = true
+                        } label: {
+                            Text(L("insights_clear_all")).font(.caption)
+                        }
+                    }
                 }
 
-                Section("Your Publications (\(publicationResults.count))") {
-                    if publicationResults.isEmpty {
-                        emptyResultsRow
-                    } else {
-                        ForEach(publicationResults) { pubResult in
+                if publicationResults.isEmpty {
+                    emptyResultsRow
+                } else {
+                    ForEach(Array(publicationResults.enumerated()), id: \.element.id) { idx, pubResult in
+                        HStack(spacing: 10) {
                             NavigationLink {
                                 PublicationCitationDetailView(
                                     publicationResult: pubResult,
                                     scholarName: selectedScholarName
                                 )
                             } label: {
-                                publicationResultRow(pubResult)
+                                HStack(spacing: 6) {
+                                    publicationResultRow(pubResult)
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                                }
                             }
-                        }
-                    }
-                }
+                            .buttonStyle(.plain)
 
-                if !contextService.batchProgress.errors.isEmpty {
-                    Section("Issues") {
-                        ForEach(contextService.batchProgress.errors, id: \.self) { error in
-                            Label(error, systemImage: "exclamationmark.triangle")
-                                .font(.caption).foregroundColor(.orange)
+                            Button(role: .destructive) {
+                                deletePublicationResult(pubResult)
+                            } label: {
+                                Image(systemName: "trash").font(.subheadline).foregroundStyle(.red)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        if idx < publicationResults.count - 1 {
+                            Divider().opacity(0.5)
                         }
                     }
                 }
             }
         }
-        .listStyle(.insetGrouped)
+    }
+
+    private var issuesCard: some View {
+        GlassSection(title: L("insights_issues")) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(contextService.batchProgress.errors, id: \.self) { error in
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundColor(.orange)
+                }
+            }
+        }
     }
 
     // MARK: - Scholar Picker
 
     private var scholarPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Select Scholar")
+            Text(L("insights_select_scholar"))
                 .font(.caption).foregroundColor(.secondary).textCase(.uppercase)
 
             if dataManager.scholars.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "person.badge.plus").foregroundColor(.secondary)
-                    Text("Add a scholar in the Dashboard first.")
+                    Text(L("insights_add_scholar_first"))
                         .font(.subheadline).foregroundColor(.secondary)
                 }
             } else {
@@ -407,17 +480,20 @@ struct CitationInsightsView: View {
                         .lineLimit(1)
                 }
                 if let citations = scholar.citations {
-                    Text("\(citations) citations")
+                    Text(L("insights_citations_suffix", citations))
                         .font(.caption2).foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(isSelected ? Color.accentColor.opacity(0.15) : Color(.systemGray6))
+            .padding(.horizontal, 14).padding(.vertical, 9)
             .foregroundColor(isSelected ? .accentColor : .primary)
-            .cornerRadius(10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.14) : Color(.systemGray6).opacity(0.55))
+            )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.7) : Color.primary.opacity(0.06),
+                                  lineWidth: isSelected ? 1.5 : 0.5)
             )
         }
     }
@@ -443,14 +519,14 @@ struct CitationInsightsView: View {
 
     private var publicationSelectionRow: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Select Publications")
+            Text(L("insights_select_publications"))
                 .font(.caption).foregroundColor(.secondary).textCase(.uppercase)
 
             if publicationsWithAuthors.isEmpty {
                 if isFetchingAuthors {
                     HStack(spacing: 10) {
                         ProgressView().scaleEffect(0.8)
-                        Text("Loading publications...")
+                        Text(L("insights_loading_pubs"))
                             .font(.subheadline).foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
@@ -458,7 +534,7 @@ struct CitationInsightsView: View {
                     VStack(spacing: 8) {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(.caption).foregroundColor(.orange)
-                        Button("Retry") {
+                        Button(L("insights_retry")) {
                             if let sid = selectedScholarId {
                                 loadPublications(forScholar: sid)
                             }
@@ -468,12 +544,12 @@ struct CitationInsightsView: View {
                 } else if selectedScholarId != nil {
                     HStack(spacing: 10) {
                         ProgressView().scaleEffect(0.8)
-                        Text("Preparing...")
+                        Text(L("insights_preparing"))
                             .font(.subheadline).foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
                 } else {
-                    Text("Select a scholar above to load publications")
+                    Text(L("insights_select_scholar_hint"))
                         .font(.subheadline).foregroundColor(.secondary)
                 }
             } else {
@@ -484,21 +560,18 @@ struct CitationInsightsView: View {
                         ForEach(grouped.keys.sorted(by: { $0.sortOrder < $1.sortOrder }), id: \.self) { role in
                             let pubs = grouped[role] ?? []
                             let selectedInRole = pubs.filter { selectedPubIds.contains($0.id) }.count
-                            HStack(spacing: 3) {
-                                Image(systemName: role.icon).font(.caption2)
-                                Text("\(selectedInRole)/\(pubs.count)")
-                                    .font(.caption).fontWeight(.medium)
-                            }
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(role.color.opacity(0.12))
-                            .foregroundColor(role.color)
-                            .cornerRadius(6)
+                            GlassChip(
+                                text: "\(selectedInRole)/\(pubs.count)",
+                                systemImage: role.icon,
+                                tint: role.color,
+                                prominent: selectedInRole > 0
+                            )
                         }
                     }
                 }
 
                 HStack {
-                    Text("\(selectedPubIds.count)/\(publicationsWithAuthors.count) selected")
+                    Text(L("insights_selected_count", selectedPubIds.count, publicationsWithAuthors.count))
                         .font(.subheadline)
                     Spacer()
                 }
@@ -508,30 +581,32 @@ struct CitationInsightsView: View {
                     Button {
                         showPublicationPicker = true
                     } label: {
-                        Label("Choose", systemImage: "checklist")
-                            .font(.subheadline)
+                        Label(L("insights_choose"), systemImage: "checklist")
+                            .font(.subheadline.weight(.medium))
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 3)
                     }
-                    .buttonStyle(.bordered)
+                    .secondaryGlassButton()
 
                     Button {
                         startBatchFetch()
                     } label: {
                         let count = newToAnalyzeCount
                         Label(
-                            count > 0 ? "Analyze (\(count))" : "All Analyzed",
+                            count > 0 ? L("insights_analyze_n", count) : L("insights_all_analyzed"),
                             systemImage: "magnifyingglass"
                         )
-                        .font(.subheadline).fontWeight(.medium)
+                        .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 3)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .primaryGlassButton()
                     .disabled(newToAnalyzeCount == 0 || contextService.batchProgress.isRunning)
                 }
 
                 // Show how many already analyzed
                 if !publicationResults.isEmpty {
-                    Text("\(publicationResults.count) publication\(publicationResults.count == 1 ? "" : "s") analyzed")
+                    Text(L("insights_n_analyzed", publicationResults.count))
                         .font(.caption).foregroundColor(.secondary)
                 }
             }
@@ -567,12 +642,12 @@ struct CitationInsightsView: View {
                     if hasAuthorInfo {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
-                                roleFilterChip(role: nil, label: "All", count: publicationsWithAuthors.count,
+                                roleFilterChip(role: nil, label: L("insights_all"), count: publicationsWithAuthors.count,
                                                icon: "person.3", color: .accentColor)
                                 ForEach(allRoles, id: \.self) { role in
                                     let count = grouped[role]?.count ?? 0
                                     if count > 0 {
-                                        roleFilterChip(role: role, label: role.displayName, count: count,
+                                        roleFilterChip(role: role, label: roleName(role), count: count,
                                                        icon: role.icon, color: role.color)
                                     }
                                 }
@@ -594,7 +669,7 @@ struct CitationInsightsView: View {
                         HStack {
                             Image(systemName: selectedPubIds.isSuperset(of: filteredIds) ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(.accentColor)
-                            Text(selectedPubIds.isSuperset(of: filteredIds) ? "Deselect All" : "Select All")
+                            Text(selectedPubIds.isSuperset(of: filteredIds) ? L("insights_deselect_all") : L("insights_select_all"))
                                 .fontWeight(.medium)
                             Spacer()
                             Text("\(selectedPubIds.intersection(filteredIds).count)/\(filteredIds.count)")
@@ -603,7 +678,7 @@ struct CitationInsightsView: View {
                     }
                 }
 
-                Section("Publications (\(pickerFilteredPubs.count))") {
+                Section(L("insights_publications_count", pickerFilteredPubs.count)) {
                     ForEach(pickerFilteredPubs) { pub in
                         let role = pub.detectRole(scholarName: selectedScholarName)
                         publicationRow(pub, role: role)
@@ -611,11 +686,12 @@ struct CitationInsightsView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Select Publications")
+            .liquidGlassCanvas()
+            .navigationTitle(L("insights_select_publications"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { showPublicationPicker = false }
+                    Button(L("insights_done")) { showPublicationPicker = false }
                         .fontWeight(.semibold)
                 }
             }
@@ -628,20 +704,14 @@ struct CitationInsightsView: View {
         return Button {
             pickerRoleFilter = role
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: icon).font(.caption2)
-                Text(label).font(.caption).fontWeight(.medium)
-                Text("(\(count))").font(.caption2)
-            }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(isActive ? color.opacity(0.2) : Color(.systemGray6))
-            .foregroundColor(isActive ? color : .primary)
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isActive ? color : Color.clear, lineWidth: 1)
+            GlassChip(
+                text: "\(label) \(count)",
+                systemImage: icon,
+                tint: isActive ? color : .secondary,
+                prominent: isActive
             )
         }
+        .buttonStyle(.plain)
     }
 
     private func publicationRow(_ pub: CitationContextService.PublicationWithAuthors, role: CitationContextService.AuthorRole) -> some View {
@@ -670,14 +740,14 @@ struct CitationInsightsView: View {
 
                     HStack(spacing: 8) {
                         if let year = pub.year {
-                            Text("\(year)").font(.caption2).foregroundColor(.secondary)
+                            Text(verbatim: "\(year)").font(.caption2).foregroundColor(.secondary)
                         }
                         if let count = pub.citationCount, count > 0 {
-                            Text("Cited by \(count)")
+                            Text(L("insights_cited_by", count))
                                 .font(.caption2).foregroundColor(.secondary)
                         }
                         if hasAuthorInfo && role != .unknown {
-                            Text(role.displayName)
+                            Text(roleName(role))
                                 .font(.caption2).fontWeight(.medium)
                                 .padding(.horizontal, 5).padding(.vertical, 1)
                                 .background(role.color.opacity(0.15))
@@ -696,24 +766,22 @@ struct CitationInsightsView: View {
 
     private func authorHighlightText(_ authors: [String], role: CitationContextService.AuthorRole) -> some View {
         let name = selectedScholarName
-        let display = authors.prefix(5)
-        let suffix = authors.count > 5 ? " et al." : ""
-
-        return HStack(spacing: 0) {
-            ForEach(Array(display.enumerated()), id: \.offset) { idx, author in
-                let isScholar = CitationContextService.PublicationWithAuthors.namesMatch(author, name)
-                if idx > 0 {
-                    Text(", ").font(.caption).foregroundColor(.secondary)
-                }
-                Text(author)
-                    .font(.caption)
-                    .fontWeight(isScholar ? .bold : .regular)
-                    .foregroundColor(isScholar ? role.color : .secondary)
-            }
-            if !suffix.isEmpty {
-                Text(suffix).font(.caption).foregroundColor(.secondary)
-            }
+        let display = Array(authors.prefix(8))
+        // Build one flowing Text run so it wraps naturally (the old HStack stayed on
+        // a single line and clipped long author lists). The scholar is highlighted
+        // with a single consistent accent, not the per-role color.
+        var line = Text("")
+        for (idx, author) in display.enumerated() {
+            let isMe = CitationContextService.PublicationWithAuthors.namesMatch(author, name)
+            if idx > 0 { line = line + Text(", ").foregroundColor(.secondary) }
+            line = line + Text(author)
+                .fontWeight(isMe ? .semibold : .regular)
+                .foregroundColor(isMe ? .accentColor : .secondary)
         }
+        if authors.count > display.count {
+            line = line + Text(" " + "et_al".localized).foregroundColor(.secondary)
+        }
+        return line.font(.caption).lineLimit(2)
     }
 
     // MARK: - Progress View
@@ -723,7 +791,7 @@ struct CitationInsightsView: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 ProgressView().scaleEffect(0.8)
-                Text("Analyzing citations...")
+                Text(L("insights_analyzing"))
                     .font(.subheadline).fontWeight(.medium)
                 Spacer()
                 Text("\(progress.currentPaperIndex)/\(progress.totalPapers)")
@@ -733,17 +801,17 @@ struct CitationInsightsView: View {
             Text(progress.currentPaperTitle)
                 .font(.caption).foregroundColor(.secondary).lineLimit(1)
             if progress.totalContextsFound > 0 {
-                Text("\(progress.totalContextsFound) citation contexts found so far")
+                Text(L("insights_contexts_found", progress.totalContextsFound))
                     .font(.caption).foregroundColor(.green)
             }
             if progress.successCount > 0 || progress.notFoundCount > 0 {
                 HStack(spacing: 12) {
                     if progress.successCount > 0 {
-                        Label("\(progress.successCount) done", systemImage: "checkmark.circle")
+                        Label(L("insights_done_count", progress.successCount), systemImage: "checkmark.circle")
                             .font(.caption2).foregroundColor(.green)
                     }
                     if progress.notFoundCount > 0 {
-                        Label("\(progress.notFoundCount) not found", systemImage: "exclamationmark.triangle")
+                        Label(L("insights_notfound_count", progress.notFoundCount), systemImage: "exclamationmark.triangle")
                             .font(.caption2).foregroundColor(.orange)
                     }
                 }
@@ -759,25 +827,20 @@ struct CitationInsightsView: View {
         let totalContexts = publicationResults.reduce(0) { $0 + $1.totalContexts }
 
         return HStack(spacing: 20) {
-            statCell(value: "\(publicationResults.count)", label: "Papers Analyzed",
+            statCell(value: "\(publicationResults.count)", label: L("insights_papers_analyzed"),
                      icon: "doc.text.magnifyingglass", color: .blue)
             Divider().frame(height: 40)
-            statCell(value: "\(totalCiting)", label: "Citing Papers",
+            statCell(value: "\(totalCiting)", label: L("insights_citing_papers"),
                      icon: "doc.on.doc", color: .purple)
             Divider().frame(height: 40)
-            statCell(value: "\(totalContexts)", label: "Contexts",
+            statCell(value: "\(totalContexts)", label: L("insights_contexts"),
                      icon: "text.quote", color: .green)
         }
         .padding(.vertical, 8)
     }
 
     private func statCell(value: String, label: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon).font(.title3).foregroundColor(color)
-            Text(value).font(.title2).fontWeight(.bold)
-            Text(label).font(.caption2).foregroundColor(.secondary).multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
+        GlassStatCell(value: value, label: label, systemImage: icon, tint: color)
     }
 
     // MARK: - Publication Result Row
@@ -791,23 +854,23 @@ struct CitationInsightsView: View {
 
             HStack(spacing: 8) {
                 if let year = pubResult.publicationYear {
-                    Text("\(year)")
+                    Text(verbatim: "\(year)")
                         .font(.caption).foregroundColor(.secondary)
                 }
                 if pubResult.fetchStatus == .notFoundOnSS {
-                    Label("Not on Semantic Scholar", systemImage: "exclamationmark.triangle")
+                    Label(L("insights_not_on_ss"), systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundColor(.orange)
                 } else if pubResult.fetchStatus == .rateLimited {
-                    Label("Rate limited", systemImage: "clock.arrow.circlepath")
+                    Label(L("insights_rate_limited"), systemImage: "clock.arrow.circlepath")
                         .font(.caption).foregroundColor(.orange)
                 } else if pubResult.fetchStatus == .error {
-                    Label("Error", systemImage: "xmark.circle")
+                    Label(L("insights_error"), systemImage: "xmark.circle")
                         .font(.caption).foregroundColor(.red)
                 } else {
-                    Label("\(pubResult.citingPapers.count) citing", systemImage: "doc.on.doc")
+                    Label(L("insights_n_citing", pubResult.citingPapers.count), systemImage: "doc.on.doc")
                         .font(.caption).foregroundColor(.purple)
                     if pubResult.totalContexts > 0 {
-                        Label("\(pubResult.totalContexts) quotes", systemImage: "text.quote")
+                        Label(L("insights_n_quotes", pubResult.totalContexts), systemImage: "text.quote")
                             .font(.caption).foregroundColor(.green)
                     }
                 }
@@ -821,8 +884,8 @@ struct CitationInsightsView: View {
     private var emptyResultsRow: some View {
         VStack(spacing: 8) {
             Image(systemName: "text.magnifyingglass").font(.title2).foregroundColor(.secondary)
-            Text("No citation data found.").font(.subheadline).foregroundColor(.secondary)
-            Text("Selected publications may not be indexed on Semantic Scholar, or have no citations with context.")
+            Text(L("insights_no_data")).font(.subheadline).foregroundColor(.secondary)
+            Text(L("insights_no_data_desc"))
                 .font(.caption).foregroundColor(.secondary).multilineTextAlignment(.center)
         }
         .padding(.vertical, 12).frame(maxWidth: .infinity)
@@ -951,10 +1014,14 @@ struct CitationInsightsView: View {
                 selectedIds: idsToAnalyze
             )
 
-            // Merge: keep existing results + add new ones
+            // Merge: replace any existing entry for the same publication (so a prior
+            // rate-limited/error result gets overwritten by a fresh successful one),
+            // and append newly-analyzed publications.
             var merged = publicationResults
             for result in newResults {
-                if !merged.contains(where: { $0.id == result.id }) {
+                if let idx = merged.firstIndex(where: { $0.id == result.id }) {
+                    merged[idx] = result
+                } else {
                     merged.append(result)
                 }
             }
@@ -964,6 +1031,33 @@ struct CitationInsightsView: View {
 
             // Persist the merged results
             contextService.savePublicationResults(merged, forScholar: scholarId)
+        }
+    }
+
+    // MARK: - Delete analyzed publications
+
+    /// Delete a single analyzed publication. It leaves `alreadyAnalyzedIds`,
+    /// so it can be selected and re-analyzed afterwards.
+    private func deletePublicationResult(_ pubResult: CitationContextService.PublicationCitationResults) {
+        publicationResults.removeAll { $0.id == pubResult.id }
+        persistResultsAfterDeletion()
+    }
+
+    private func deletePublicationResults(at offsets: IndexSet) {
+        publicationResults.remove(atOffsets: offsets)
+        persistResultsAfterDeletion()
+    }
+
+    private func clearAllPublicationResults() {
+        publicationResults.removeAll()
+        persistResultsAfterDeletion()
+    }
+
+    private func persistResultsAfterDeletion() {
+        guard let scholarId = selectedScholarId else { return }
+        contextService.savePublicationResults(publicationResults, forScholar: scholarId)
+        if publicationResults.isEmpty {
+            hasFetched = false
         }
     }
 }
@@ -976,6 +1070,18 @@ struct PublicationCitationDetailView: View {
 
     @State private var sortOrder: CitationContextService.CitingSortOrder = .yearDesc
     @State private var expandedResultId: String?
+
+    private func L(_ key: String) -> String { LocalizationManager.shared.localized(key) }
+    private func L(_ key: String, _ args: CVarArg...) -> String {
+        String(format: LocalizationManager.shared.localized(key), arguments: args)
+    }
+    private func sortName(_ o: CitationContextService.CitingSortOrder) -> String {
+        switch o {
+        case .yearDesc: return L("insights_sort_newest")
+        case .yearAsc: return L("insights_sort_oldest")
+        case .contextCountDesc: return L("insights_sort_quotes")
+        }
+    }
 
     private var sortedPapers: [CitationContextService.BatchCitationResult] {
         let papers = publicationResult.citingPapers
@@ -994,21 +1100,21 @@ struct PublicationCitationDetailView: View {
             Section {
                 HStack(spacing: 20) {
                     detailStatCell(value: "\(publicationResult.citingPapers.count)",
-                                   label: "Citing Papers", icon: "doc.on.doc", color: .purple)
+                                   label: L("insights_citing_papers"), icon: "doc.on.doc", color: .purple)
                     Divider().frame(height: 40)
                     detailStatCell(value: "\(publicationResult.papersWithContexts)",
-                                   label: "With Quotes", icon: "text.quote", color: .green)
+                                   label: L("insights_with_quotes"), icon: "text.quote", color: .green)
                     Divider().frame(height: 40)
                     detailStatCell(value: "\(publicationResult.totalContexts)",
-                                   label: "Contexts", icon: "quote.opening", color: .blue)
+                                   label: L("insights_contexts"), icon: "quote.opening", color: .blue)
                 }
                 .padding(.vertical, 4)
             }
 
             Section {
-                Picker("Sort by", selection: $sortOrder) {
+                Picker(L("insights_sort_by"), selection: $sortOrder) {
                     ForEach(CitationContextService.CitingSortOrder.allCases, id: \.self) { order in
-                        Text(order.displayName).tag(order)
+                        Text(sortName(order)).tag(order)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -1023,11 +1129,13 @@ struct PublicationCitationDetailView: View {
                                   ? "exclamationmark.triangle.fill" : "xmark.circle.fill")
                                 .foregroundColor(.orange)
                             Text(publicationResult.fetchStatus == .notFoundOnSS
-                                 ? "Not Found on Semantic Scholar"
-                                 : publicationResult.fetchStatus == .rateLimited ? "Rate Limited" : "Fetch Error")
+                                 ? L("insights_not_found_title")
+                                 : publicationResult.fetchStatus == .rateLimited ? L("insights_rate_limited_title") : L("insights_fetch_error_title"))
                                 .font(.subheadline).fontWeight(.medium)
                         }
-                        Text(publicationResult.fetchStatus.displayMessage)
+                        Text(publicationResult.fetchStatus == .notFoundOnSS ? L("insights_ss_notfound_msg")
+                             : publicationResult.fetchStatus == .rateLimited ? L("insights_ss_ratelimit_msg")
+                             : L("insights_ss_error_msg"))
                             .font(.caption).foregroundColor(.secondary)
                         if let detail = publicationResult.fetchErrorDetail {
                             Text(detail)
@@ -1038,13 +1146,13 @@ struct PublicationCitationDetailView: View {
                 }
             }
 
-            Section("Citing Papers (\(sortedPapers.count))") {
+            Section(L("insights_citing_count", sortedPapers.count)) {
                 if sortedPapers.isEmpty && publicationResult.fetchStatus == .success {
                     VStack(spacing: 8) {
                         Image(systemName: "text.magnifyingglass").font(.title2).foregroundColor(.secondary)
-                        Text("No citing papers found.")
+                        Text(L("insights_no_citing"))
                             .font(.subheadline).foregroundColor(.secondary)
-                        Text("This paper may have citations that Semantic Scholar hasn't indexed yet.")
+                        Text(L("insights_no_citing_desc"))
                             .font(.caption).foregroundColor(.secondary).multilineTextAlignment(.center)
                     }
                     .padding(.vertical, 12).frame(maxWidth: .infinity)
@@ -1059,11 +1167,11 @@ struct PublicationCitationDetailView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 4) {
                                 Image(systemName: "info.circle").font(.caption)
-                                Text("\(withCtx)/\(total) papers have citation context")
+                                Text(L("insights_ctx_count", withCtx, total))
                                     .font(.caption).fontWeight(.medium)
                             }
                             .foregroundColor(.secondary)
-                            Text("Papers without context: Semantic Scholar only extracts verbatim quotes from open-access full texts. Paywalled or non-indexed papers won't have citation context.")
+                            Text(L("insights_ctx_explainer"))
                                 .font(.caption2).foregroundColor(.secondary)
                         }
                         .padding(.vertical, 4)
@@ -1076,7 +1184,8 @@ struct PublicationCitationDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Citations")
+        .liquidGlassCanvas()
+        .navigationTitle(L("insights_citations_title"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -1102,7 +1211,7 @@ struct PublicationCitationDetailView: View {
                                 .font(.caption).foregroundColor(.secondary)
                         }
                         if let year = result.citingYear {
-                            Text("(\(year))").font(.caption).foregroundColor(.secondary)
+                            Text(verbatim: "(\(year))").font(.caption).foregroundColor(.secondary)
                         }
                     }
 
@@ -1116,11 +1225,11 @@ struct PublicationCitationDetailView: View {
 
                     HStack(spacing: 8) {
                         if !result.contexts.isEmpty {
-                            Label("\(result.contexts.count) quote\(result.contexts.count == 1 ? "" : "s")",
+                            Label(L("insights_n_quotes", result.contexts.count),
                                   systemImage: "text.quote")
                                 .font(.caption2).foregroundColor(.green)
                         } else {
-                            Label("No full text access", systemImage: "lock.fill")
+                            Label(L("insights_no_fulltext"), systemImage: "lock.fill")
                                 .font(.caption2).foregroundColor(.secondary)
                         }
                         Spacer()
@@ -1147,25 +1256,20 @@ struct PublicationCitationDetailView: View {
     private func intentPill(_ intent: CitationContext.CitationIntent) -> some View {
         let (label, color): (String, Color) = {
             switch intent {
-            case .methodology: return ("Methodology", .blue)
-            case .background: return ("Background", .gray)
-            case .result: return ("Result", .green)
-            case .extends: return ("Extends", .purple)
-            case .unknown: return ("Other", .secondary)
+            case .methodology: return (L("intent_methodology"), .blue)
+            case .background: return (L("intent_background"), .gray)
+            case .result: return (L("intent_result"), .green)
+            case .extends: return (L("intent_extends"), .purple)
+            case .unknown: return (L("intent_other"), .secondary)
             }
         }()
-        return Text(label)
-            .font(.caption2).fontWeight(.medium)
-            .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
-            .cornerRadius(4)
+        return GlassChip(text: label, tint: color)
     }
 
     private func quoteCard(quote: String, index: Int, total: Int, paperYear: Int?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if total > 1 {
-                Text("Context \(index) of \(total)")
+                Text(L("insights_context_i_of_n", index, total))
                     .font(.caption2).foregroundColor(.secondary)
             }
 
@@ -1181,7 +1285,7 @@ struct PublicationCitationDetailView: View {
                 Button {
                     UIPasteboard.general.string = quote
                 } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label(L("insights_copy"), systemImage: "doc.on.doc")
                         .font(.caption).foregroundColor(.accentColor)
                 }
             }
@@ -1241,12 +1345,7 @@ struct PublicationCitationDetailView: View {
     }
 
     private func detailStatCell(value: String, label: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon).font(.title3).foregroundColor(color)
-            Text(value).font(.title2).fontWeight(.bold)
-            Text(label).font(.caption2).foregroundColor(.secondary).multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
+        GlassStatCell(value: value, label: label, systemImage: icon, tint: color)
     }
 }
 

@@ -30,6 +30,7 @@ struct UserData: Codable {
 }
 import ConfettiSwiftUI
 import WSOnBoarding
+import Pow
 import UIKit
 import BackgroundTasks
 import WidgetKit
@@ -724,12 +725,11 @@ struct MainView: View {
     private var sidebarItems: [(String, String, String, Int)] {
         let lm = localizationManager
         return [
-            ("chart.bar.fill",       lm.localized("dashboard"),         "dashboard",         0),
-            ("person.2.fill",        lm.localized("scholars"),          "scholars",          1),
-            ("chart.xyaxis.line",    lm.localized("charts"),            "charts",            2),
-            ("quote.bubble.fill",    lm.localized("who_cite_me"),       "who_cite_me",       3),
-            ("text.magnifyingglass", lm.localized("citation_insights"), "citation_insights", 4),
-            ("gear",                 lm.localized("settings"),          "settings",          5),
+            ("chart.bar.fill",    lm.localized("dashboard"),         "dashboard",         0),
+            ("person.2.fill",     lm.localized("scholars"),          "scholars",          1),
+            ("chart.xyaxis.line", lm.localized("charts"),            "charts",            2),
+            ("quote.bubble.fill", lm.localized("citation_insights"), "citation_insights", 3),
+            ("gear",              lm.localized("settings"),          "settings",          4),
         ]
     }
 
@@ -750,28 +750,30 @@ struct MainView: View {
         case 2:
             NavigationView {
                 ScrollView(.vertical, showsIndicators: true) {
-                    VStack(spacing: 12) {
-                        ScholarsGrowthLineChartView()
-                            .environmentObject(DataManager.shared)
-                            .environmentObject(localizationManager)
-                            .frame(maxHeight: horizontalSizeClass == .regular ? 600 : 450)
-                            .frame(minHeight: horizontalSizeClass == .regular ? 500 : 440)
-                        contributionChartSection
+                    VStack(spacing: GlassMetrics.cardSpacing) {
+                        GlassCard {
+                            ScholarsGrowthLineChartView()
+                                .environmentObject(DataManager.shared)
+                                .environmentObject(localizationManager)
+                                .frame(maxHeight: horizontalSizeClass == .regular ? 600 : 450)
+                                .frame(minHeight: horizontalSizeClass == .regular ? 500 : 440)
+                        }
+                        GlassCard {
+                            contributionChartSection
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
                     .padding(.bottom)
                 }
+                .liquidGlassCanvas()
                 .navigationTitle(localizationManager.localized("charts"))
                 .navigationBarTitleDisplayMode(.large)
             }
             .navigationViewStyle(StackNavigationViewStyle())
         case 3:
-            WhoCiteMeView()
-                .analyticsScreen(AnalyticsScreen.whoCiteMe)
-        case 4:
             CitationInsightsView()
-        case 5:
+        case 4:
             SettingsView()
                 .analyticsScreen(AnalyticsScreen.settings)
         default:
@@ -792,7 +794,7 @@ struct MainView: View {
                         Image(systemName: icon)
                     }
                     .tag(tag)
-                    .badge(tag == 3 && badgeCountManager.count > 0 ? badgeCountManager.count : 0)
+                    .badge(tag == 1 && badgeCountManager.count > 0 ? badgeCountManager.count : 0)
                 }
             }
             .navigationTitle("CiteTrack")
@@ -808,48 +810,34 @@ struct MainView: View {
         }
     }
 
-    // MARK: - iPhone Tab Bar Layout
+    // MARK: - iPhone Tab Bar Layout (native)
+    // We use the native SwiftUI `TabView` tab bar directly. With exactly 5 tabs we
+    // stay within the system tab bar's 5-item limit, so there is no "More" overflow
+    // (and therefore no phantom back button that the 6-tab layout used to produce).
+    // "Who Cite Me" is no longer a tab — its full functionality now lives inside the
+    // Scholars tab (tap a scholar to drill into who cites them).
     private var iPhoneTabView: some View {
         TabView(selection: $selectedTab) {
             contentView(for: 0)
-                .toolbar(.hidden, for: .tabBar)
-                .tabItem { Label("", systemImage: "chart.bar.fill") }
+                .tabItem { Label(localizationManager.localized("dashboard"), systemImage: "chart.bar.fill") }
                 .tag(0)
 
             contentView(for: 1)
-                .toolbar(.hidden, for: .tabBar)
-                .tabItem { Label("", systemImage: "person.2.fill") }
+                .tabItem { Label(localizationManager.localized("scholars"), systemImage: "person.2.fill") }
+                .badge(badgeCountManager.count)
                 .tag(1)
 
             contentView(for: 2)
-                .toolbar(.hidden, for: .tabBar)
-                .tabItem { Label("", systemImage: "chart.xyaxis.line") }
+                .tabItem { Label(localizationManager.localized("charts"), systemImage: "chart.xyaxis.line") }
                 .tag(2)
 
             contentView(for: 3)
-                .toolbar(.hidden, for: .tabBar)
-                .tabItem { Label("", systemImage: "quote.bubble") }
-                .badge(badgeCountManager.count)
+                .tabItem { Label(localizationManager.localized("citation_insights"), systemImage: "quote.bubble.fill") }
                 .tag(3)
 
             contentView(for: 4)
-                .toolbar(.hidden, for: .tabBar)
-                .tabItem { Label("", systemImage: "text.magnifyingglass") }
+                .tabItem { Label(localizationManager.localized("settings"), systemImage: "gear") }
                 .tag(4)
-
-            contentView(for: 5)
-                .toolbar(.hidden, for: .tabBar)
-                .tabItem { Label("", systemImage: "gear") }
-                .tag(5)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                Divider()
-                NativeTabBarView(selectedTab: $selectedTab, badgeCount: badgeCountManager.count)
-                    .frame(height: 49)
-            }
-            .background(.bar)
-            .ignoresSafeArea(edges: .bottom)
         }
     }
 
@@ -882,62 +870,15 @@ struct MainView: View {
     }
 }
 
-// MARK: - Native UITabBar (all 6 items, no More)
-
-private struct NativeTabBarView: UIViewRepresentable {
-    @Binding var selectedTab: Int
-    let badgeCount: Int
-
-    func makeUIView(context: Context) -> UITabBar {
-        let bar = UITabBar()
-        bar.delegate = context.coordinator
-        // Remove UITabBar's own background so SwiftUI's .bar material handles it uniformly
-        bar.backgroundImage = UIImage()
-        bar.shadowImage = UIImage()
-        bar.isTranslucent = true
-        let lm = LocalizationManager.shared
-        let defs: [(String, String, Int)] = [
-            ("chart.bar.fill",       lm.localized("dashboard"),         0),
-            ("person.2.fill",        lm.localized("scholars"),          1),
-            ("chart.xyaxis.line",    lm.localized("charts"),            2),
-            ("quote.bubble.fill",    lm.localized("who_cite_me"),       3),
-            ("text.magnifyingglass", lm.localized("citation_insights"), 4),
-            ("gear",                 lm.localized("settings"),          5),
-        ]
-        bar.setItems(defs.map { icon, title, tag in
-            UITabBarItem(title: title, image: UIImage(systemName: icon), tag: tag)
-        }, animated: false)
-        bar.selectedItem = bar.items?[selectedTab]
-        applyBadge(bar)
-        return bar
-    }
-
-    func updateUIView(_ bar: UITabBar, context: Context) {
-        guard let items = bar.items, selectedTab < items.count else { return }
-        bar.selectedItem = items[selectedTab]
-        applyBadge(bar)
-    }
-
-    private func applyBadge(_ bar: UITabBar) {
-        bar.items?[3].badgeValue = badgeCount > 0 ? (badgeCount > 99 ? "99+" : "\(badgeCount)") : nil
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator($selectedTab) }
-
-    final class Coordinator: NSObject, UITabBarDelegate {
-        @Binding var selectedTab: Int
-        init(_ t: Binding<Int>) { _selectedTab = t }
-        func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) { selectedTab = item.tag }
-    }
-}
-
 // 仪表板视图
 struct DashboardView: View {
     @StateObject private var dataManager = DataManager.shared
     @StateObject private var localizationManager = LocalizationManager.shared
     @State private var sortOption: SortOption = .total
     @AppStorage("ConfirmedMyScholarId") private var confirmedMyScholarId: String?
-    
+    // Drives the Pow staggered entrance every time the Dashboard appears.
+    @State private var revealed = false
+
     enum SortOption: String, CaseIterable {
         case total
         case week
@@ -1013,33 +954,68 @@ struct DashboardView: View {
     var body: some View {
         NavigationView {
             ZStack {
+                // Soft adaptive canvas so Liquid Glass has tone to refract.
+                Group {
+                    if #available(iOS 18.0, *) {
+                        MeshGradient(
+                            width: 3, height: 3,
+                            points: [
+                                [0.0, 0.0], [0.5, 0.0], [1.0, 0.0],
+                                [0.0, 0.5], [0.5, 0.5], [1.0, 0.5],
+                                [0.0, 1.0], [0.5, 1.0], [1.0, 1.0]
+                            ],
+                            colors: [
+                                Color(.systemBackground), Color.blue.opacity(0.10), Color(.systemBackground),
+                                Color.teal.opacity(0.08), Color(.systemBackground), Color.indigo.opacity(0.10),
+                                Color(.systemBackground), Color.green.opacity(0.07), Color(.systemBackground)
+                            ]
+                        )
+                    } else {
+                        LinearGradient(
+                            colors: [Color(.systemBackground), Color.blue.opacity(0.08),
+                                     Color(.systemBackground)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        )
+                    }
+                }
+                .ignoresSafeArea()
+
                 ScrollView {
                 LazyVStack(spacing: 20) {
                     // 头部区域：统计卡片 + 排序控件
                     VStack(spacing: 12) {
-                        // 统计卡片
+                        // 统计卡片 — Liquid Glass
+                        GlassGroup(spacing: 14) {
                         HStack(spacing: 12) {
-                        StatisticsCard(
-                            title: localizationManager.localized("my_citations"),
-                            value: {
-                                if let sid = confirmedMyScholarId, let me = dataManager.getScholar(id: sid) {
-                                    return "\(me.citations ?? 0)"
-                                } else {
-                                    return "0"
-                                }
-                            }(),
-                            icon: "quote.bubble.fill",
-                            color: .blue
-                        )
-                        
-                        StatisticsCard(
-                            title: localizationManager.localized("scholar_count"),
-                            value: "\(dataManager.scholars.count)",
-                            icon: "person.2.fill",
-                            color: .green
-                        )
+                        if revealed {
+                            StatisticsCard(
+                                title: localizationManager.localized("my_citations"),
+                                value: {
+                                    if let sid = confirmedMyScholarId, let me = dataManager.getScholar(id: sid) {
+                                        return "\(me.citations ?? 0)"
+                                    } else {
+                                        return "0"
+                                    }
+                                }(),
+                                icon: "quote.bubble.fill",
+                                color: .blue
+                            )
+                            // Pow: cards spring up on every visit.
+                            .transition(.movingParts.boing(edge: .bottom))
+
+                            StatisticsCard(
+                                title: localizationManager.localized("scholar_count"),
+                                value: "\(dataManager.scholars.count)",
+                                icon: "person.2.fill",
+                                color: .green
+                            )
+                            .transition(.movingParts.boing(edge: .bottom))
+                            .animation(.spring(response: 0.55, dampingFraction: 0.62)
+                                .delay(0.08), value: revealed)
                         }
-                        
+                        }
+                        }
+
                         // 排序控件
                         if !dataManager.scholars.isEmpty {
                             Picker(localizationManager.localized("sort_by"), selection: $sortOption) {
@@ -1058,20 +1034,43 @@ struct DashboardView: View {
                     
                     // 学者列表（支持排序与前三名勋章）
                     if !dataManager.scholars.isEmpty {
-                        LazyVStack(alignment: .leading, spacing: 10) {
+                        LazyVStack(alignment: .leading, spacing: 6) {
                             Text(localizationManager.localized("citation_ranking"))
-                                .font(.headline)
-                            
+                                .font(.system(.headline, design: .rounded))
+                                .padding(.bottom, 6)
+
                             ForEach(Array(sortedScholars.enumerated()), id: \.element.id) { index, scholar in
-                                HStack(spacing: 8) {
-                                    if index < 3 {
-                                        Image(systemName: "medal.fill")
-                                            .foregroundColor(index == 0 ? .yellow : (index == 1 ? .gray : .orange))
+                                if revealed {
+                                    HStack(spacing: 10) {
+                                        if index < 3 {
+                                            Image(systemName: "medal.fill")
+                                                .foregroundColor(index == 0 ? .yellow : (index == 1 ? .gray : .orange))
+                                                // Pow: the gold medal gives a soft glow pulse.
+                                                .conditionalEffect(
+                                                    .repeat(.glow(color: .yellow, radius: 12),
+                                                            every: 2.4),
+                                                    condition: index == 0
+                                                )
+                                        }
+                                        ScholarRow(scholar: scholar, subtitle: subtitle(for: scholar))
                                     }
-                                    ScholarRow(scholar: scholar, subtitle: subtitle(for: scholar))
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 4)
+                                    // Pow: rows slide+pop in, staggered, on every visit.
+                                    .transition(.movingParts.filmExposure.combined(with: .move(edge: .trailing)))
+                                    .animation(.spring(response: 0.5, dampingFraction: 0.74)
+                                        .delay(0.10 + Double(index) * 0.05), value: revealed)
+
+                                    if index < sortedScholars.count - 1 {
+                                        Divider().opacity(0.4)
+                                    }
                                 }
                             }
                         }
+                        .padding(18)
+                        .liquidGlassCard(cornerRadius: 24)
+                        .animation(.spring(response: 0.45, dampingFraction: 0.78),
+                                   value: sortOption)
                     } else {
                         VStack(spacing: 16) {
                             Image(systemName: "person.2.circle")
@@ -1114,6 +1113,13 @@ struct DashboardView: View {
                 )
             }
             .navigationTitle(localizationManager.localized("dashboard_title"))
+            .onAppear {
+                revealed = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    revealed = true
+                }
+            }
+            .onDisappear { revealed = false }
         }
         .navigationViewStyle(.stack)
     }
@@ -1442,20 +1448,25 @@ struct NewScholarView: View {
         List {
 
             ForEach(dataManager.scholarsForList, id: \.id) { scholar in
-                ScholarRowWithChartAndManagement(
-                    scholar: scholar,
-                    onChartTap: {
-                        print("📊 [Chart] Scholar chart tap: \(scholar.displayName), id=\(scholar.id)")
-                        activeSheet = .chart(scholar)
-                    },
-                    onUpdateTap: {
-                        print("🟡 [Update Tap] \(String(format: "debug_update_tap_print".localized, scholar.id, scholar.displayName))")
-                        // 单个学者的手动刷新也应计数
-                        CT_RecordManualRefresh()
-                        fetchScholarInfo(for: scholar)
-                    },
-                    isLoading: loadingScholarId == scholar.id
-                )
+                NavigationLink {
+                    // 点进每位学者 → 完整的「谁引用了我」详情（论文列表 + 引用下钻）
+                    WhoCiteMeView(scholar: scholar)
+                } label: {
+                    ScholarRowWithChartAndManagement(
+                        scholar: scholar,
+                        onChartTap: {
+                            print("📊 [Chart] Scholar chart tap: \(scholar.displayName), id=\(scholar.id)")
+                            activeSheet = .chart(scholar)
+                        },
+                        onUpdateTap: {
+                            print("🟡 [Update Tap] \(String(format: "debug_update_tap_print".localized, scholar.id, scholar.displayName))")
+                            // 单个学者的手动刷新也应计数
+                            CT_RecordManualRefresh()
+                            fetchScholarInfo(for: scholar)
+                        },
+                        isLoading: loadingScholarId == scholar.id
+                    )
+                }
                 .overlay(alignment: .topLeading) {
                     if dataManager.isPinned(scholar.id) {
                         Image(systemName: "pin.fill")
@@ -1465,6 +1476,7 @@ struct NewScholarView: View {
                             .padding(.top, 2)
                     }
                 }
+                .glassRow()
                 .swipeActions(edge: .trailing) {
                     Button(localizationManager.localized("delete"), role: .destructive) {
                         pendingDeleteScholars = [scholar]
@@ -1510,7 +1522,9 @@ struct NewScholarView: View {
                 dataManager.applyMove(from: indices, to: newOffset)
             }
         }
+        .listStyle(.plain)
         .coordinateSpace(name: "pullSpace")
+        .liquidGlassCanvas()
     }
 
     @ToolbarContentBuilder
@@ -2027,6 +2041,8 @@ struct SettingsView: View {
                     }
                 }
             }
+            .listStyle(.insetGrouped)
+            .liquidGlassCanvas()
             .navigationTitle(localizationManager.localized("settings"))
             .onAppear {
                 // 🚀 优化：后台异步执行 iCloud 检查，避免阻塞 UI
@@ -2520,6 +2536,7 @@ struct AddScholarView: View {
                     .disabled(scholarId.isEmpty || isLoading)
                 }
             }
+            .liquidGlassCanvas()
             .navigationTitle(localizationManager.localized("add_scholar"))
             .navigationBarTitleDisplayMode(.inline)
             .analyticsScreen(AnalyticsScreen.addScholar)
@@ -2666,6 +2683,7 @@ struct EditScholarView: View {
                     }
                 }
             }
+            .liquidGlassCanvas()
             .navigationTitle(localizationManager.localized("edit_scholar"))
             .navigationBarTitleDisplayMode(.inline)
             .analyticsScreen(AnalyticsScreen.editScholar)
@@ -2695,32 +2713,286 @@ struct EditScholarView: View {
     }
 }
 
-// 统计卡片组件
+// MARK: - Liquid Glass (Apple iOS 26 design language)
+// Native `glassEffect`, availability-guarded with a clean Material fallback.
+extension View {
+    @ViewBuilder
+    func liquidGlassCard(cornerRadius: CGFloat = 18,
+                         tint: Color? = nil) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(
+                (tint != nil ? Glass.regular.tint(tint!.opacity(0.30)) : .regular)
+                    .interactive(),
+                in: .rect(cornerRadius: cornerRadius)
+            )
+        } else {
+            self
+                .background(.ultraThinMaterial,
+                            in: RoundedRectangle(cornerRadius: cornerRadius,
+                                                 style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+                )
+        }
+    }
+}
+
+// Coordinates blending/morphing between adjacent glass elements (iOS 26),
+// passes through unchanged on earlier systems.
+struct GlassGroup<Content: View>: View {
+    var spacing: CGFloat = 12
+    @ViewBuilder var content: Content
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - Liquid Glass canvas (shared by every tab)
+// A soft, adaptive mesh gradient so glass surfaces have tone to refract. Using the
+// same canvas behind every screen makes the whole app read as one continuous Liquid
+// Glass surface (matches the Dashboard).
+struct LiquidGlassBackground: View {
+    var body: some View {
+        Group {
+            if #available(iOS 18.0, *) {
+                MeshGradient(
+                    width: 3, height: 3,
+                    points: [
+                        [0.0, 0.0], [0.5, 0.0], [1.0, 0.0],
+                        [0.0, 0.5], [0.5, 0.5], [1.0, 0.5],
+                        [0.0, 1.0], [0.5, 1.0], [1.0, 1.0]
+                    ],
+                    colors: [
+                        Color(.systemBackground), Color.blue.opacity(0.10), Color(.systemBackground),
+                        Color.teal.opacity(0.08), Color(.systemBackground), Color.indigo.opacity(0.10),
+                        Color(.systemBackground), Color.green.opacity(0.07), Color(.systemBackground)
+                    ]
+                )
+            } else {
+                LinearGradient(
+                    colors: [Color(.systemBackground), Color.blue.opacity(0.08), Color(.systemBackground)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
+extension View {
+    /// Places the shared Liquid Glass canvas behind this view and hides the opaque
+    /// system scroll/list background so the canvas shows through (List & Form).
+    @ViewBuilder
+    func liquidGlassCanvas() -> some View {
+        self
+            .scrollContentBackground(.hidden)
+            .background(LiquidGlassBackground())
+    }
+}
+
+// MARK: - Liquid Glass component kit
+// One card shape, one material, one shadow, one spacing rhythm — so every surface
+// reads as deliberate iOS 26 Liquid Glass instead of ad-hoc panels. Build content
+// screens as `ScrollView { VStack(spacing: GlassMetrics.cardSpacing) { GlassSection… } }`.
+enum GlassMetrics {
+    static let cardRadius: CGFloat = 24
+    static let cardPadding: CGFloat = 18
+    static let cardSpacing: CGFloat = 16
+    static let screenPadding: CGFloat = 16
+}
+
+extension View {
+    /// The single Liquid Glass surface used by every card: native `glassEffect`
+    /// (iOS 26) or a Material fallback, plus a soft shadow for lift and a hairline
+    /// edge for definition. Keep this the ONLY place glass + shadow are defined.
+    @ViewBuilder
+    func glassSurface(cornerRadius: CGFloat = GlassMetrics.cardRadius, tint: Color? = nil) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(
+                    tint != nil ? Glass.regular.tint(tint!.opacity(0.16)) : .regular,
+                    in: .rect(cornerRadius: cornerRadius)
+                )
+                .shadow(color: .black.opacity(0.06), radius: 12, y: 5)
+        } else {
+            self
+                .background(.ultraThinMaterial,
+                            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.06), radius: 12, y: 5)
+        }
+    }
+}
+
+/// A padded Liquid Glass card. The base content surface across the app.
+struct GlassCard<Content: View>: View {
+    var cornerRadius: CGFloat = GlassMetrics.cardRadius
+    var padding: CGFloat = GlassMetrics.cardPadding
+    var tint: Color? = nil
+    @ViewBuilder var content: Content
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(padding)
+            .glassSurface(cornerRadius: cornerRadius, tint: tint)
+    }
+}
+
+/// A labeled section: a small uppercase caption header above a glass card body.
+/// This is the standard building block for content screens.
+struct GlassSection<Content: View>: View {
+    var title: String? = nil
+    var systemImage: String? = nil
+    var trailing: AnyView? = nil
+    var padding: CGFloat = GlassMetrics.cardPadding
+    var tint: Color? = nil
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            if title != nil || trailing != nil {
+                HStack(spacing: 6) {
+                    if let systemImage {
+                        Image(systemName: systemImage).font(.caption2.weight(.semibold))
+                    }
+                    if let title {
+                        Text(title).font(.footnote.weight(.semibold)).textCase(.uppercase)
+                    }
+                    Spacer(minLength: 0)
+                    if let trailing { trailing }
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+            }
+            GlassCard(padding: padding, tint: tint) { content }
+        }
+    }
+}
+
+// MARK: - Liquid Glass micro-components (chips, stats, buttons)
+
+/// One compact capsule for every tag/role/keyword/intent. `prominent` raises the
+/// fill + adds a hairline ring for a selected/active state.
+struct GlassChip: View {
+    let text: String
+    var systemImage: String? = nil
+    var tint: Color = .secondary
+    var prominent: Bool = false
+    var body: some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage).font(.caption2.weight(.semibold))
+            }
+            Text(text).font(.caption.weight(.medium))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(tint.opacity(prominent ? 0.20 : 0.12), in: Capsule())
+        .overlay(Capsule().strokeBorder(tint.opacity(prominent ? 0.45 : 0), lineWidth: 1))
+    }
+}
+
+/// A single metric cell: icon · big rounded value · caption. Used in summary rows.
+struct GlassStatCell: View {
+    let value: String
+    let label: String
+    let systemImage: String
+    var tint: Color = .accentColor
+    var body: some View {
+        VStack(spacing: 5) {
+            Image(systemName: systemImage).font(.title3).foregroundStyle(tint)
+            Text(value)
+                .font(.system(.title2, design: .rounded).weight(.bold))
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.caption2).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).lineLimit(2)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+extension View {
+    /// Primary action — native iOS 26 prominent glass button (bordered fallback).
+    @ViewBuilder func primaryGlassButton(tint: Color = .accentColor) -> some View {
+        if #available(iOS 26.0, *) {
+            self.buttonStyle(.glassProminent).tint(tint)
+        } else {
+            self.buttonStyle(.borderedProminent).tint(tint)
+        }
+    }
+    /// Secondary action — native iOS 26 glass button (bordered fallback).
+    @ViewBuilder func secondaryGlassButton(tint: Color = .accentColor) -> some View {
+        if #available(iOS 26.0, *) {
+            self.buttonStyle(.glass).tint(tint)
+        } else {
+            self.buttonStyle(.bordered).tint(tint)
+        }
+    }
+
+    /// Turns a List row into a floating Liquid Glass card so list-based screens
+    /// (which need swipe/reorder/toggles) read like the GlassCards everywhere else.
+    /// Use together with `.listStyle(.plain)` and `.liquidGlassCanvas()`.
+    func glassRow(cornerRadius: CGFloat = 20) -> some View {
+        self
+            .listRowSeparator(.hidden)
+            // Content sits inside the card: 16pt screen gap + 16pt internal padding.
+            .listRowInsets(EdgeInsets(top: 20, leading: 32, bottom: 20, trailing: 32))
+            .listRowBackground(GlassRowBackdrop(cornerRadius: cornerRadius))
+    }
+}
+
+/// Glass card backdrop for a List row — inset from the cell edges so each row reads
+/// as a floating card with side gaps (matches the GlassCards on the other screens).
+struct GlassRowBackdrop: View {
+    var cornerRadius: CGFloat = 20
+    var body: some View {
+        Color.clear
+            .glassSurface(cornerRadius: cornerRadius)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+    }
+}
+
+// 统计卡片组件 — Liquid Glass surface
 struct StatisticsCard: View {
     let title: String
     let value: String
     let icon: String
     let color: Color
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: icon)
-                    .foregroundColor(color)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(color)
                 Spacer()
             }
-            
+
             Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-            
+                .font(.system(.title, design: .rounded).weight(.bold))
+                .contentTransition(.numericText())
+                .animation(.snappy, value: value)
+                // Pow: the number subtly shines whenever it updates.
+                .changeEffect(.shine.delay(0.05), value: value)
+
             Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .liquidGlassCard(cornerRadius: 22, tint: color)
     }
 }
 
@@ -3164,6 +3436,7 @@ struct ScholarChartDetailView: View {
                         }
                 )
             }
+            .liquidGlassCanvas()
             .navigationTitle(localizationManager.localized("citation_trend"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

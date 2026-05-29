@@ -70,9 +70,9 @@ struct CitationContextSection: View {
                     .font(.title3)
                     .foregroundColor(.accentColor)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Sign in to see citation context")
+                    Text("ctx_signin_title".localized)
                         .font(.subheadline).fontWeight(.medium)
-                    Text("Discover the exact text where this paper cites your work.")
+                    Text("ctx_signin_desc".localized)
                         .font(.caption).foregroundColor(.secondary)
                 }
             }
@@ -88,7 +88,7 @@ struct CitationContextSection: View {
     private var loadingRow: some View {
         HStack(spacing: 10) {
             ProgressView().scaleEffect(0.8)
-            Text("Searching Semantic Scholar...")
+            Text("ctx_searching".localized)
                 .font(.caption).foregroundColor(.secondary)
         }
         .padding(14)
@@ -102,9 +102,9 @@ struct CitationContextSection: View {
             Image(systemName: "magnifyingglass.circle")
                 .foregroundColor(.secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Context not available")
+                Text("ctx_unavailable".localized)
                     .font(.subheadline).fontWeight(.medium)
-                Text("This paper may not yet be indexed in \(source.displayName).")
+                Text(String(format: "ctx_not_indexed".localized, source.displayName))
                     .font(.caption).foregroundColor(.secondary)
             }
         }
@@ -118,15 +118,13 @@ struct CitationContextSection: View {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundColor(.orange)
             VStack(alignment: .leading, spacing: 2) {
-                Text(message == "rate_limited" ? "Rate limited" : "Failed to load")
+                Text(message == "rate_limited" ? "insights_rate_limited".localized : "ctx_failed".localized)
                     .font(.subheadline).fontWeight(.medium)
-                Text(message == "rate_limited"
-                     ? "Semantic Scholar rate limit reached. Please try again in a minute."
-                     : message)
+                Text(message == "rate_limited" ? "ctx_ratelimit_msg".localized : message)
                     .font(.caption).foregroundColor(.secondary)
             }
             Spacer()
-            Button("Retry") { load() }
+            Button("retry".localized) { load() }
                 .font(.caption).foregroundColor(.accentColor)
         }
         .padding(14)
@@ -156,7 +154,7 @@ struct CitationContextSection: View {
             // Source attribution
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.seal")
-                Text("Source: \(ctx.source.displayName)")
+                Text(String(format: "ctx_source".localized, ctx.source.displayName))
             }
             .font(.caption2)
             .foregroundColor(.secondary)
@@ -166,7 +164,7 @@ struct CitationContextSection: View {
     private func quoteCard(quote: String, index: Int, total: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if total > 1 {
-                Text("Context \(index) of \(total)")
+                Text(String(format: "insights_context_i_of_n".localized, index, total))
                     .font(.caption2).foregroundColor(.secondary)
             }
 

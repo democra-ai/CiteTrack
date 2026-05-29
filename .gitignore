@@ -37,6 +37,7 @@ Temporary Items
 *.xcworkspace/xcuserdata/
 *.xcworkspace/xcshareddata/
 build/
+build_device/
 DerivedData/
 *.pbxuser
 *.mode1v3

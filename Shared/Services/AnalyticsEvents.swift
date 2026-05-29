@@ -250,14 +250,17 @@ enum AnalyticsTabName {
     static let scholars = "scholars"
     static let charts = "charts"
     static let whoCiteMe = "who_cited_me"
+    static let insights = "citation_insights"
     static let settings = "settings"
 
+    // Tab layout (5 tabs): Who-Cite-Me is no longer a standalone tab — its
+    // functionality lives inside the Scholars tab (tap a scholar to drill in).
     static func from(index: Int) -> String {
         switch index {
         case 0: return dashboard
         case 1: return scholars
         case 2: return charts
-        case 3: return whoCiteMe
+        case 3: return insights
         case 4: return settings
         default: return "unknown_\(index)"
         }

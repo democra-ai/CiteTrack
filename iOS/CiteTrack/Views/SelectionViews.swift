@@ -42,6 +42,7 @@ struct ThemeSelectionView: View {
                 }
             }
         }
+        .liquidGlassCanvas()
         .navigationTitle(localizationManager.localized("theme"))
         .navigationBarTitleDisplayMode(.inline)
         .analyticsScreen(AnalyticsScreen.themeSelection)
@@ -89,6 +90,7 @@ struct WidgetThemeSelectionView: View {
                 }
             }
         }
+        .liquidGlassCanvas()
         .navigationTitle(localizationManager.localized("widget_theme"))
         .navigationBarTitleDisplayMode(.inline)
         .analyticsScreen(AnalyticsScreen.widgetThemeSelection)
@@ -139,6 +141,7 @@ struct LanguageSelectionView: View {
                 }
             }
         }
+        .liquidGlassCanvas()
         .navigationTitle(localizationManager.localized("select_language"))
         .navigationBarTitleDisplayMode(.inline)
         .analyticsScreen(AnalyticsScreen.languageSelection)

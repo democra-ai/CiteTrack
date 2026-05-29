@@ -135,15 +135,25 @@ public class SemanticScholarService {
         return nil
     }
 
-    /// Keyword search via /paper/search (stricter rate limit, 100 req/5min)
+    /// Keyword search via /paper/search/bulk.
+    ///
+    /// We deliberately use the BULK endpoint instead of /paper/search. The relevance
+    /// endpoint (/paper/search) is throttled extremely hard on the free, key-less
+    /// pool and returns HTTP 429 almost constantly — this is exactly why a paper with
+    /// a short/generic title (e.g. "Federated mutual learning", whose /paper/search/match
+    /// best hit is a *different* longer paper that fails our similarity gate) would get
+    /// stuck showing "rate limited" while papers with distinctive titles resolved fine.
+    ///
+    /// /paper/search/bulk has a far more lenient limit and returns up to 1000 matches
+    /// in a single call. Results aren't relevance-ranked, so we pick the closest title
+    /// match client-side — an exact title scores 1.0 and wins over near-duplicates.
     private func searchPaperByKeyword(title: String) async throws -> SSPaperSearchResult? {
         await throttle()
 
-        var components = URLComponents(string: "\(baseURL)/paper/search")!
+        var components = URLComponents(string: "\(baseURL)/paper/search/bulk")!
         components.queryItems = [
             URLQueryItem(name: "query", value: title),
-            URLQueryItem(name: "fields", value: "paperId,title,year,authors"),
-            URLQueryItem(name: "limit", value: "5")
+            URLQueryItem(name: "fields", value: "paperId,title,year,authors")
         ]
 
         guard let url = components.url else { throw SemanticScholarError.invalidURL }
@@ -151,10 +161,14 @@ public class SemanticScholarService {
 
         let decoded = try JSONDecoder().decode(SSSearchResponse.self, from: response)
 
-        // Pick the result whose title most closely matches our query
-        return decoded.data.max { a, b in
-            titleSimilarity(a.title, title) < titleSimilarity(b.title, title)
+        // Pick the result whose title most closely matches our query, but only accept
+        // it if it's actually close (avoids latching onto an unrelated paper when the
+        // real one simply isn't indexed).
+        guard let best = decoded.data.max(by: { titleSimilarity($0.title, title) < titleSimilarity($1.title, title) }),
+              titleSimilarity(best.title, title) > 0.5 else {
+            return nil
         }
+        return best
     }
 
     // MARK: - Get Citations with Context

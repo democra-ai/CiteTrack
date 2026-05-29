@@ -119,6 +119,16 @@ class BadgeCountManager: ObservableObject {
 
 // MARK: - Who Cite Me View
 struct WhoCiteMeView: View {
+    /// When non-nil, this view is embedded inside the Scholars tab for a specific
+    /// scholar. In that mode it skips its own `NavigationView` (the Scholars list
+    /// already provides a navigation context) and the horizontal scholar picker,
+    /// and pins to this scholar. When nil it behaves as a standalone screen.
+    let embeddedScholar: Scholar?
+
+    init(scholar: Scholar? = nil) {
+        self.embeddedScholar = scholar
+    }
+
     @StateObject private var citationManager = CitationManager.shared
     @StateObject private var dataManager = DataManager.shared
     @StateObject private var localizationManager = LocalizationManager.shared
@@ -257,45 +267,71 @@ struct WhoCiteMeView: View {
         }
     }
     
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                if dataManager.scholars.isEmpty {
-                    emptyStateView
-                } else {
-                    // 学者选择器
+    // Conditionally wraps the content in its own NavigationView. When embedded in
+    // the Scholars tab (`embeddedScholar != nil`) the parent already provides a
+    // navigation context, so we skip our own to avoid a nested/duplicate nav bar
+    // (which would show a spurious back button).
+    @ViewBuilder
+    private var mainContent: some View {
+        if embeddedScholar != nil {
+            innerContent
+        } else {
+            NavigationView {
+                innerContent
+            }
+            .navigationViewStyle(.stack)
+        }
+    }
+
+    private var innerContent: some View {
+        VStack(spacing: 0) {
+            if dataManager.scholars.isEmpty {
+                emptyStateView
+            } else {
+                // 学者选择器（嵌入 Scholars 时隐藏，固定为点进来的那位学者）
+                if embeddedScholar == nil {
                     scholarPicker
-                    
-                    if let scholar = selectedScholar {
-                        // 内容区域
-                        contentView(for: scholar)
-                    } else {
-                        selectScholarPrompt
-                    }
                 }
-            }
-            .navigationTitle("who_cite_me".localized)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    // 只保留排序按钮
-                    if selectedScholar != nil {
-                        sortButtonToolbar(for: selectedScholar!.id)
-                    }
+
+                if let scholar = selectedScholar {
+                    // 内容区域
+                    contentView(for: scholar)
+                } else {
+                    selectScholarPrompt
                 }
-            }
-            .sheet(isPresented: $showingFilterSheet) {
-                CitationFilterView(filter: $currentFilter)
-            }
-            .sheet(isPresented: $showingExportSheet) {
-                exportOptionsView
-            }
-            .sheet(isPresented: $showingCitedPublicationsSheet) {
-                citedPublicationsSheetView
             }
         }
-        .navigationViewStyle(.stack)
+        .navigationTitle(embeddedScholar?.displayName ?? "who_cite_me".localized)
+        .navigationBarTitleDisplayMode(embeddedScholar == nil ? .automatic : .inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                // 只保留排序按钮
+                if selectedScholar != nil {
+                    sortButtonToolbar(for: selectedScholar!.id)
+                }
+            }
+        }
+        .sheet(isPresented: $showingFilterSheet) {
+            CitationFilterView(filter: $currentFilter)
+        }
+        .sheet(isPresented: $showingExportSheet) {
+            exportOptionsView
+        }
+        .sheet(isPresented: $showingCitedPublicationsSheet) {
+            citedPublicationsSheetView
+        }
+    }
+
+    var body: some View {
+        mainContent
         .onAppear {
-            if selectedScholar == nil {
+            if let embedded = embeddedScholar {
+                // 嵌入模式：固定为点进来的那位学者
+                if selectedScholar?.id != embedded.id {
+                    selectedScholar = embedded
+                    loadData(for: embedded)
+                }
+            } else if selectedScholar == nil {
                 // 优先选择 "it's me" 的学者，否则选择第一个
                 let firstScholar: Scholar?
                 if let myScholarId = confirmedMyScholarId,
@@ -304,16 +340,16 @@ struct WhoCiteMeView: View {
                 } else {
                     firstScholar = sortedScholars.first
                 }
-                
+
                 if let firstScholar = firstScholar {
                     selectedScholar = firstScholar
                     loadData(for: firstScholar)
                 }
             }
-            
+
             // 更新被引用文章数量（包括导航栏 Badge）
             updateCitedPublicationsCount()
-            
+
             // 确保在视图出现时也更新一次 Badge
             Task { @MainActor in
                 badgeCountManager.updateCount()
@@ -452,7 +488,8 @@ struct WhoCiteMeView: View {
             }
         }
         .onChange(of: confirmedMyScholarId) { _, _ in
-            // 当 "it's me" 改变时，重新选择学者
+            // 当 "it's me" 改变时，重新选择学者（嵌入模式固定学者，不切换）
+            guard embeddedScholar == nil else { return }
             if let myScholarId = confirmedMyScholarId,
                let myScholar = dataManager.scholars.first(where: { $0.id == myScholarId }) {
                 selectedScholar = myScholar
@@ -523,7 +560,7 @@ struct WhoCiteMeView: View {
                                 .lineLimit(1)
                             
                             if isMyScholar {
-                                Text("(It's me)")
+                                Text("(" + "its_me".localized + ")")
                                     .font(.caption2)
                                     .foregroundColor(.green)
                             }
@@ -659,12 +696,15 @@ struct WhoCiteMeView: View {
             VStack(spacing: 16) {
                 // 论文列表（显示引用数量）
                 publicationListView(for: scholar.id)
+                    .padding(16)
+                    .liquidGlassCard(cornerRadius: 22)
             }
             .padding()
         }
         .refreshable {
             await refreshData(for: scholar)
         }
+        .liquidGlassCanvas()
     }
     
     
@@ -1087,6 +1127,7 @@ struct WhoCiteMeView: View {
                     }
                 }
             }
+            .liquidGlassCanvas()
             .navigationTitle("export_format".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1338,15 +1379,15 @@ struct WhoCiteMeView: View {
         NavigationView {
             List {
                 if let scholar = selectedScholarForBadge {
-                    Section(header: Text("\(scholar.displayName) 的被引用论文")) {
+                    Section(header: Text(String(format: "whocite_scholar_cited".localized, scholar.displayName))) {
                         ForEach(citedPublicationsForScholar) { publication in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(publication.title)
                                     .font(.headline)
-                                
+
                                 HStack {
                                     if let citationCount = publication.citationCount {
-                                        Label("\(citationCount) 次引用", systemImage: "quote.bubble")
+                                        Label(String(format: "whocite_n_citations".localized, citationCount), systemImage: "quote.bubble")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
@@ -1362,15 +1403,16 @@ struct WhoCiteMeView: View {
                         }
                     }
                 } else {
-                    Text("没有未读的被引用论文")
+                    Text("whocite_no_unread".localized)
                         .foregroundColor(.secondary)
                 }
             }
-            .navigationTitle("被引用论文")
+            .liquidGlassCanvas()
+            .navigationTitle("whocite_cited_pubs".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("done".localized) {
                         // 标记所有显示的论文为已读
                         markPublicationsAsRead(citedPublicationsForScholar)
                         showingCitedPublicationsSheet = false
@@ -1454,12 +1496,13 @@ struct CitingPapersSheetContent: View {
                     }
                 }
             }
-            .navigationTitle(selectedCitingPaper == nil ? "引用文章 (\(citingPapers.count))" : "文章详情")
+            .liquidGlassCanvas()
+            .navigationTitle(selectedCitingPaper == nil ? String(format: "whocite_citing_n".localized, citingPapers.count) : "whocite_article_detail".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     if selectedCitingPaper != nil {
-                        Button("返回") {
+                        Button("back".localized) {
                             selectedCitingPaper = nil
                         }
                     } else {
@@ -1494,7 +1537,7 @@ struct CitingPapersSheetContent: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("关闭") {
+                    Button("close".localized) {
                         selectedCitingPaper = nil
                         onDismiss()
                     }
@@ -1713,7 +1756,7 @@ struct CitingPapersSheetContent: View {
                 Button(action: {
                     onLoadCitingPapers()
                 }) {
-                    Label("重试", systemImage: "arrow.clockwise")
+                    Label("retry".localized, systemImage: "arrow.clockwise")
                         .font(.subheadline)
                 }
                 .buttonStyle(.bordered)
@@ -1727,7 +1770,7 @@ struct CitingPapersSheetContent: View {
                         UIApplication.shared.open(url)
                         #endif
                     }) {
-                        Label("在浏览器中打开", systemImage: "safari")
+                        Label("open_in_browser".localized, systemImage: "safari")
                             .font(.subheadline)
                             .foregroundColor(.white)
                             .padding(.horizontal, 20)

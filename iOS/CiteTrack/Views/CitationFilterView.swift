@@ -75,6 +75,7 @@ struct CitationFilterView: View {
                     }
                 }
             }
+            .liquidGlassCanvas()
             .navigationTitle("filter_options".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

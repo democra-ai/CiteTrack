@@ -351,7 +351,7 @@ struct ScholarsGrowthLineChartView: View {
         // 颜色样式（不同学者不同颜色）
         let grad = gradientForScholarId(scholarId)
         let style = ChartStyle(
-            backgroundColor: Color(.systemBackground),
+            backgroundColor: .clear,   // transparent so the Liquid Glass card shows through
             accentColor: grad.start,
             secondGradientColor: grad.end,
             textColor: Color.primary,
