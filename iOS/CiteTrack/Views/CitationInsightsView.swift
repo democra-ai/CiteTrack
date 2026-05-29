@@ -23,6 +23,7 @@ struct CitationInsightsView: View {
     @State private var showPublicationPicker = false
     @State private var isFetchingAuthors = false
     @State private var isRefiningRoles = false
+    @State private var roleRefineTask: Task<Void, Never>? = nil
     @State private var loadError: String?
     @State private var hasAuthorInfo = false
     @State private var pickerRoleFilter: CitationContextService.AuthorRole? = nil
@@ -64,6 +65,7 @@ struct CitationInsightsView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .onDisappear { roleRefineTask?.cancel() }
         .sheet(isPresented: $showSignIn) {
             GoogleSignInView { onSignedIn() }
         }
@@ -306,11 +308,15 @@ struct CitationInsightsView: View {
         let pending = publicationsWithAuthors.filter { !$0.authorListComplete }
         guard !pending.isEmpty else { return }
         isRefiningRoles = true
-        Task {
+        roleRefineTask = Task {
             defer { Task { @MainActor in isRefiningRoles = false } }
-            // Bound the number of OpenAlex lookups per pass; results persist so
-            // subsequent sessions skip already-refined publications.
-            for pub in pending.prefix(60) {
+            // Resolve in the background and COLLECT results, then apply them to the UI
+            // ONCE at the end. The previous version reassigned publicationsWithAuthors
+            // after every single network call — dozens of full list re-renders that made
+            // the whole app feel frozen. Capped + cancellable when leaving the tab.
+            var refinedById: [String: CitationContextService.PublicationWithAuthors] = [:]
+            for pub in pending.prefix(40) {
+                if Task.isCancelled { break }
                 guard let resolved = await OpenAlexEnrichmentClient.shared.resolveOwnAuthorship(
                     title: pub.title, year: pub.year, scholarName: scholarName
                 ) else { continue }
@@ -319,7 +325,7 @@ struct CitationInsightsView: View {
                 // match (similar title) — replacing the author list there would show the
                 // wrong authors. Keep the original list in that case.
                 guard resolved.matchedIndex != nil, !resolved.authorNames.isEmpty else { continue }
-                let refined = CitationContextService.PublicationWithAuthors(
+                refinedById[pub.id] = CitationContextService.PublicationWithAuthors(
                     id: pub.id,
                     title: pub.title,
                     year: pub.year,
@@ -328,13 +334,10 @@ struct CitationInsightsView: View {
                     authorListComplete: true,
                     correspondingByOpenAlex: resolved.isCorresponding
                 )
-                await MainActor.run {
-                    if let i = publicationsWithAuthors.firstIndex(where: { $0.id == pub.id }) {
-                        publicationsWithAuthors[i] = refined
-                    }
-                }
             }
+            guard !refinedById.isEmpty else { return }
             await MainActor.run {
+                publicationsWithAuthors = publicationsWithAuthors.map { refinedById[$0.id] ?? $0 }
                 hasAuthorInfo = publicationsWithAuthors.contains { !$0.authors.isEmpty }
                 contextService.savePublicationAuthors(publicationsWithAuthors, forScholar: scholarId)
             }

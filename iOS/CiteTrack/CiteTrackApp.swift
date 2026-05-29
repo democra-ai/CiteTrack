@@ -237,10 +237,9 @@ struct CiteTrackApp: App {
             if newPhase == .active {
                 AnalyticsService.shared.log(AnalyticsEventName.appForeground)
                 AnalyticsService.shared.processWidgetEvents()
-                // 前台激活：从 CloudKit 拉取其他设备/会话的最新数据并合并（向下同步）。
-                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.8) {
-                    iCloudSyncManager.shared.syncDownFromCloudKit(reason: "foreground")
-                }
+                // (Sync-down runs once on launch, not on every foreground — pulling +
+                //  merging on each activation did main-thread import work during active
+                //  use and made the UI stutter.)
                 // 应用激活时尝试安排下一次刷新
                 CiteTrackApp.scheduleAppRefresh()
                 // 前台激活时，立即同步全局 LastRefreshTime
