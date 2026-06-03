@@ -47,7 +47,15 @@ struct MacMainWindow: View {
                             Label(p.title, systemImage: p.icon).tag(p)
                         }
                     } header: {
-                        Text("CiteTrack").font(.headline).foregroundColor(.primary).padding(.bottom, 2)
+                        HStack(spacing: 6) {
+                            Text("CiteTrack").font(.headline).foregroundColor(.primary)
+                            Text(verbatim: "BETA")
+                                .font(.caption2).fontWeight(.bold)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Capsule().fill(Color.orange.opacity(0.18)))
+                                .foregroundColor(.orange)
+                        }
+                        .padding(.bottom, 2)
                     }
                 }
                 .listStyle(.sidebar)

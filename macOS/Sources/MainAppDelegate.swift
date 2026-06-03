@@ -204,7 +204,11 @@ class MainAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     #endif
     
     @objc private func showAbout() {
-        NSApp.orderFrontStandardAboutPanel(nil)
+        let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "7"
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationVersion: "\(short) (\(build)) · Beta"
+        ])
     }
     
     @objc private func quitApp() {

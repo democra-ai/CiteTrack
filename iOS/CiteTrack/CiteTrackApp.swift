@@ -2042,8 +2042,13 @@ struct SettingsView: View {
                             .foregroundColor(.gray)
                         Text(localizationManager.localized("version"))
                         Spacer()
-                        Text("1.0.0")
+                        Text(verbatim: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
                             .foregroundColor(.secondary)
+                        Text(verbatim: "BETA")
+                            .font(.caption2).fontWeight(.bold)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().fill(Color.orange.opacity(0.18)))
+                            .foregroundColor(.orange)
                     }
                 }
             }
