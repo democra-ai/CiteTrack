@@ -9,6 +9,7 @@ export const strings = {
     charts: { headline: ["Watch it", "grow."], sub: "Citation history, charted over time." },
     insights: { headline: ["See who", "cites you."], sub: "Notable scholars, top venues — every citation, decoded." },
     whoCited: { headline: ["Every paper,", "tracked."], sub: "Your whole body of work, citation by citation." },
+    devices: { headline: "On all your devices." },
     logo: {
       headline: "iPhone. Mac. In sync.",
       sub: "iCloud-synced · always in your menu bar",
@@ -51,6 +52,7 @@ export const strings = {
     charts: { headline: ["见证它的", "增长。"], sub: "引用历史，随时间清晰呈现。" },
     insights: { headline: ["看清是谁", "在引用你。"], sub: "知名学者、顶级刊物——读懂每一次引用。" },
     whoCited: { headline: ["每一篇", "都被追踪。"], sub: "你的全部成果，逐次引用尽收眼底。" },
+    devices: { headline: "在你的所有设备上。" },
     logo: {
       headline: "iPhone 与 Mac，实时同步。",
       sub: "iCloud 同步 · 常驻菜单栏",

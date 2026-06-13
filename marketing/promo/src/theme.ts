@@ -1,32 +1,30 @@
-// CiteTrack promo — refined dark palette.
-// Charcoal base (no navy/purple "AI lila"), a single desaturated blue accent,
-// off-white text. Real app screenshots provide the color; the chrome stays calm.
+// CiteTrack promo — "Bright Airy" studio palette (Apple product-page direction).
+// Warm off-white canvas, soft directional light, ONE desaturated sage accent.
+// Depth (device shadows) separates the real light-UI screenshots, not a dark bg.
 
 export const palette = {
-  bg0: "#090A0E", // deepest
-  bg1: "#0C0D12", // base canvas
-  bg2: "#101218",
-  bg3: "#15171F", // panel / surface
-  brand: "#5B8CFF", // single accent (electric blue, desaturated)
-  brandSoft: "#8AA8FF",
-  accent: "#5B8CFF",
-  accentSoft: "#8AA8FF",
-  success: "#3DD68C",
-  gold: "#E8B84B",
-  silver: "#C7D1DE",
-  bronze: "#D08A52",
-  surface: "#15171F",
-  white: "#F3F4F7", // off-white, never pure
-  muted: "#9CA2AE",
+  canvas: "#F4F2EE", // warm paper off-white base
+  ink: "#1E2329", // headline text (~13:1 on canvas)
+  sub: "#5A6068", // sub-labels
+  sage: "#5E8C7B", // the single accent
+  sageSoft: "#7BA593",
+  sageTint: "#DCE6E0", // chips / tint pad
+  bezel: "#26272B", // device bezel
+  macBody: "#C9CBCE",
+  white: "#FFFFFF",
+  shadow: "58,66,78", // cool slate — never pure black
+  // legacy aliases used by older components
+  brand: "#5E8C7B",
+  brandSoft: "#7BA593",
+  muted: "#5A6068",
+  bg1: "#F4F2EE",
 } as const;
 
 export const gradients = {
-  brand: `linear-gradient(135deg, ${palette.brand} 0%, ${palette.brandSoft} 100%)`,
-  warmth: `linear-gradient(135deg, ${palette.brand} 0%, ${palette.brandSoft} 100%)`,
-  gold: `linear-gradient(180deg, ${palette.gold} 0%, #C99A2E 100%)`,
-  silver: `linear-gradient(180deg, ${palette.silver} 0%, #8A95A5 100%)`,
-  bronze: `linear-gradient(180deg, ${palette.bronze} 0%, #A05E2C 100%)`,
-  bgVertical: `linear-gradient(180deg, ${palette.bg0} 0%, ${palette.bg1} 60%, ${palette.bg2} 100%)`,
+  // studio light pools (desaturated tinted daylight, fade to transparent — no edges)
+  cool: "rgba(214,224,232,0.55)",
+  warm: "rgba(238,228,214,0.50)",
+  verticalWash: "linear-gradient(180deg, #F8F7F3 0%, #F2F0EB 52%, #ECEAE3 100%)",
 } as const;
 
 export const radius = {
