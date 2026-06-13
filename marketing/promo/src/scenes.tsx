@@ -128,15 +128,13 @@ export const SceneHook: React.FC = () => {
           <div
             style={{
               fontFamily: f.display,
-              fontWeight: 900,
-              fontSize: landscape ? 280 : 240,
+              fontWeight: 800,
+              fontSize: landscape ? 256 : 226,
               lineHeight: 1,
-              color: "transparent",
-              backgroundImage: gradients.brand,
-              backgroundClip: "text",
-              WebkitBackgroundClip: "text",
+              letterSpacing: "-0.03em",
+              color: palette.white,
               transform: `scale(${pulse})`,
-              filter: "drop-shadow(0 20px 60px rgba(77,108,242,0.45))",
+              textShadow: "0 10px 50px rgba(0,0,0,0.45)",
             }}
           >
             {n.toLocaleString()}
@@ -270,12 +268,12 @@ export const SceneLogo: React.FC = () => {
             style={{
               padding: "8px 20px",
               borderRadius: 999,
-              background: "rgba(253,158,69,0.18)",
-              border: "1px solid rgba(253,158,69,0.5)",
+              background: "rgba(91,140,255,0.14)",
+              border: "1px solid rgba(91,140,255,0.45)",
               fontFamily: f.ui,
-              fontWeight: 800,
+              fontWeight: 700,
               fontSize: 26,
-              color: palette.accentSoft,
+              color: palette.brandSoft,
             }}
           >
             {t.logo.beta}

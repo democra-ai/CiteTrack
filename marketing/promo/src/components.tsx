@@ -14,25 +14,44 @@ export const useLandscape = () => {
   return width > height;
 };
 
-/* Animated brand background with a drifting glow blob. */
+/* Fine film grain overlay — the premium texture that kills the flat/cheap look. */
+const Grain: React.FC = () => (
+  <AbsoluteFill style={{ opacity: 0.05, mixBlendMode: "overlay", pointerEvents: "none" }}>
+    <svg width="100%" height="100%" preserveAspectRatio="none">
+      <filter id="grainNoise">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves={2} stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+      <rect width="100%" height="100%" filter="url(#grainNoise)" />
+    </svg>
+  </AbsoluteFill>
+);
+
+/* Refined dark canvas: charcoal base + soft desaturated blue mesh + grain + vignette. */
 export const Bg: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const drift = interpolate(frame, [0, 300], [0, 1]);
+  const d1 = interpolate(frame, [0, 300], [0, 50]);
+  const d2 = interpolate(frame, [0, 300], [0, -40]);
+  const blob = (x: number, y: number, s: number, color: string, blur: number): React.CSSProperties => ({
+    position: "absolute",
+    left: x,
+    top: y,
+    width: s,
+    height: s,
+    borderRadius: "50%",
+    background: `radial-gradient(closest-side, ${color}, transparent 72%)`,
+    filter: `blur(${blur}px)`,
+  });
   return (
-    <AbsoluteFill
-      style={{ background: gradients.bgVertical, overflow: "hidden" }}
-    >
-      <div
+    <AbsoluteFill style={{ background: palette.bg1, overflow: "hidden" }}>
+      <div style={blob(width * 0.12, height * 0.08 + d1, width * 0.95, "rgba(91,140,255,0.20)", 70)} />
+      <div style={blob(width * 0.5, height * 0.52 + d2, width * 0.8, "rgba(58,108,196,0.14)", 80)} />
+      <div style={blob(-width * 0.12, height * 0.66, width * 0.7, "rgba(40,70,150,0.12)", 90)} />
+      <Grain />
+      <AbsoluteFill
         style={{
-          position: "absolute",
-          left: width * 0.5 - 700,
-          top: height * 0.22 + drift * 40,
-          width: 1400,
-          height: 1000,
-          borderRadius: "50%",
-          background: `radial-gradient(closest-side, ${palette.brandSoft}55, transparent)`,
-          filter: "blur(20px)",
+          background: "radial-gradient(125% 85% at 50% 38%, transparent 42%, rgba(0,0,0,0.55) 100%)",
         }}
       />
       {children}
@@ -110,13 +129,11 @@ export const Title: React.FC<{
             key={i}
             style={{
               fontFamily: f.display,
-              fontWeight: 900,
+              fontWeight: 800,
               fontSize: size,
-              lineHeight: 1.08,
-              color: accent ? "transparent" : palette.white,
-              backgroundImage: accent ? gradients.warmth : undefined,
-              backgroundClip: accent ? "text" : undefined,
-              WebkitBackgroundClip: accent ? "text" : undefined,
+              lineHeight: 1.04,
+              letterSpacing: "-0.025em",
+              color: accent ? palette.brand : palette.white,
               opacity: s,
               transform: `translateY(${interpolate(s, [0, 1], [40, 0])}px)`,
             }}
