@@ -10,6 +10,7 @@ export const strings = {
     insights: { headline: ["See who", "cites you."], sub: "Notable scholars, top venues — every citation, decoded." },
     whoCited: { headline: ["Every paper,", "tracked."], sub: "Your whole body of work, citation by citation." },
     devices: { headline: "On all your devices." },
+    poster: { line1: "Your impact,", line2: "in focus.", sub: "Track, analyze, and own every citation." },
     logo: {
       headline: "iPhone. Mac. In sync.",
       sub: "iCloud-synced · always in your menu bar",
@@ -53,6 +54,7 @@ export const strings = {
     insights: { headline: ["看清是谁", "在引用你。"], sub: "知名学者、顶级刊物——读懂每一次引用。" },
     whoCited: { headline: ["每一篇", "都被追踪。"], sub: "你的全部成果，逐次引用尽收眼底。" },
     devices: { headline: "在你的所有设备上。" },
+    poster: { line1: "你的影响力，", line2: "一目了然。", sub: "追踪、分析，掌握每一次引用。" },
     logo: {
       headline: "iPhone 与 Mac，实时同步。",
       sub: "iCloud 同步 · 常驻菜单栏",

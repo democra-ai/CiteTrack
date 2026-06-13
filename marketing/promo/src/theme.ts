@@ -6,16 +6,16 @@ export const palette = {
   canvas: "#F4F2EE", // warm paper off-white base
   ink: "#1E2329", // headline text (~13:1 on canvas)
   sub: "#5A6068", // sub-labels
-  sage: "#5E8C7B", // the single accent
-  sageSoft: "#7BA593",
-  sageTint: "#DCE6E0", // chips / tint pad
+  sage: "#006EEE", // the single accent — CiteTrack logo blue
+  sageSoft: "#4F95F2",
+  sageTint: "#DCEAFB", // chips / tint pad (light blue)
   bezel: "#26272B", // device bezel
   macBody: "#C9CBCE",
   white: "#FFFFFF",
   shadow: "58,66,78", // cool slate — never pure black
   // legacy aliases used by older components
-  brand: "#5E8C7B",
-  brandSoft: "#7BA593",
+  brand: "#006EEE",
+  brandSoft: "#4F95F2",
   muted: "#5A6068",
   bg1: "#F4F2EE",
 } as const;

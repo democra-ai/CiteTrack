@@ -16,12 +16,55 @@ import {
   Subline,
   SoloDevice,
   DeviceCluster,
+  PhoneFrame,
   useCountUp,
   useLandscape,
 } from "./components";
 import { usePromo } from "./context";
 
 const sh = (a: number) => `rgba(${palette.shadow},${a})`;
+
+/* S0 — Poster: a complete static key-art held for the opening (frame 0 = poster) */
+export const ScenePoster: React.FC = () => {
+  const { f, t } = usePromo();
+  const { height } = useVideoConfig();
+  const landscape = useLandscape();
+  const phoneW = (landscape ? height * 0.72 : height * 0.42) * (1320 / 2868);
+  return (
+    <Bg>
+      <AbsoluteFill
+        style={{
+          alignItems: "center",
+          justifyContent: "center",
+          padding: landscape ? 120 : 80,
+          flexDirection: landscape ? "row" : "column",
+          gap: landscape ? 96 : 50,
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", alignItems: landscape ? "flex-start" : "center", textAlign: landscape ? "left" : "center", maxWidth: landscape ? 940 : 1000 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            <Img src={staticFile("icon.png")} style={{ width: 92, height: 92, borderRadius: 21, boxShadow: `0 14px 36px ${sh(0.2)}` }} />
+            <div style={{ fontFamily: f.display, fontWeight: 700, fontSize: 60, letterSpacing: "-0.02em", color: palette.ink }}>CiteTrack</div>
+          </div>
+          <div style={{ marginTop: 38, fontFamily: f.display, fontWeight: 700, fontSize: landscape ? 100 : 90, lineHeight: 1.02, letterSpacing: "-0.035em", color: palette.ink }}>
+            {t.poster.line1}
+            <br />
+            <span style={{ color: palette.sage }}>{t.poster.line2}</span>
+          </div>
+          <div style={{ marginTop: 24, fontFamily: f.ui, fontWeight: 500, fontSize: 32, color: palette.sub, maxWidth: 620 }}>{t.poster.sub}</div>
+          <div style={{ display: "flex", gap: 10, marginTop: 32, flexWrap: "wrap", justifyContent: landscape ? "flex-start" : "center" }}>
+            {["iPhone", "iPad", "Mac", t.logo.beta].map((p) => (
+              <span key={p} style={{ padding: "9px 20px", borderRadius: 999, background: palette.sageTint, color: palette.sage, fontFamily: f.ui, fontWeight: 600, fontSize: 22 }}>
+                {p}
+              </span>
+            ))}
+          </div>
+        </div>
+        <PhoneFrame screen="insights" width={phoneW} />
+      </AbsoluteFill>
+    </Bg>
+  );
+};
 
 /* S1 — Hook: count-up on the bright canvas */
 export const SceneHook: React.FC = () => {

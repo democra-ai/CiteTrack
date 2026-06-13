@@ -55,7 +55,7 @@ export const Bg: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       />
       <AbsoluteFill
         style={{
-          background: `radial-gradient(70% 26% at 50% 62%, rgba(220,230,224,0.5) 0%, rgba(220,230,224,0) 65%)`,
+          background: `radial-gradient(70% 26% at 50% 62%, rgba(214,228,250,0.5) 0%, rgba(214,228,250,0) 65%)`,
         }}
       />
       <AbsoluteFill
@@ -248,42 +248,44 @@ export const MacFrame: React.FC<{ screen: string; device?: "ios" | "ipad"; width
   lang,
 }) => {
   const frame = useCurrentFrame();
-  const { lang: cl } = usePromo();
+  const { lang: cl, f } = usePromo();
   const L = lang ?? cl;
   const screenW = width;
   const screenH = screenW * (10 / 16); // 16:10 display
   const { scale } = kenBurns(frame);
-  const innerH = screenH * 0.9;
-  const ar = device === "ipad" ? 1668 / 2388 : 1320 / 2868;
-  const innerW = innerH * ar;
+  const u = screenW / 1000; // scale unit
+  const sidebarW = screenW * 0.23;
+  // the real Insights content column, full-height (mirrors the macOS unified window)
+  const colH = screenH * 0.92;
+  const ar = device === "ipad" ? 1668 / 2420 : 1320 / 2868;
+  const colW = colH * ar;
+  const nav = L === "zh" ? ["学者", "图表", "引用分析", "设置"] : ["Scholars", "Charts", "Insights", "Settings"];
   return (
-    <div style={{ filter: `drop-shadow(0 40px 80px ${sh(0.18)}) drop-shadow(0 8px 16px ${sh(0.1)})` }}>
-      {/* screen */}
-      <div
-        style={{
-          width: screenW,
-          height: screenH,
-          borderRadius: 18,
-          padding: 12,
-          background: "#1C1C1E",
-          boxShadow: `inset 0 0 0 1px ${sh(0.2)}`,
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            borderRadius: 8,
-            overflow: "hidden",
-            background: palette.canvas,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {/* app window centered on the desktop */}
-          <div style={{ width: innerW, height: innerH, borderRadius: 14, overflow: "hidden", background: "#000", boxShadow: `0 10px 30px ${sh(0.25)}, inset 0 0 0 1px ${sh(0.1)}` }}>
-            <Img src={screenSrc(screen, device, L)} style={{ width: "100%", display: "block", transform: `scale(${scale})`, transformOrigin: "top center" }} />
+    <div style={{ filter: `drop-shadow(0 44px 90px ${sh(0.18)}) drop-shadow(0 10px 18px ${sh(0.1)})` }}>
+      <div style={{ width: screenW, height: screenH, borderRadius: 18, padding: 12, background: "#1C1C1E", boxShadow: `inset 0 0 0 1px ${sh(0.22)}` }}>
+        <div style={{ width: "100%", height: "100%", borderRadius: 9, overflow: "hidden", background: palette.canvas, display: "flex" }}>
+          {/* sidebar — matches the real macOS unified window */}
+          <div style={{ width: sidebarW, background: "rgba(255,255,255,0.5)", borderRight: `1px solid ${sh(0.07)}`, padding: 22 * u, display: "flex", flexDirection: "column", gap: 8 * u }}>
+            <div style={{ fontFamily: f.display, fontWeight: 700, fontSize: 30 * u, color: palette.ink, marginBottom: 14 * u }}>CiteTrack</div>
+            {nav.map((it, i) => {
+              const active = i === 2;
+              return (
+                <div key={it} style={{ display: "flex", alignItems: "center", gap: 12 * u, padding: `${10 * u}px ${14 * u}px`, borderRadius: 10 * u, background: active ? palette.sageTint : "transparent", color: active ? palette.sage : palette.sub, fontFamily: f.ui, fontWeight: active ? 600 : 500, fontSize: 22 * u }}>
+                  <div style={{ width: 17 * u, height: 17 * u, borderRadius: 5 * u, background: active ? palette.sage : palette.sub, opacity: active ? 1 : 0.5 }} />
+                  {it}
+                </div>
+              );
+            })}
+            <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10 * u, paddingTop: 14 * u, borderTop: `1px solid ${sh(0.07)}` }}>
+              <div style={{ width: 34 * u, height: 34 * u, borderRadius: "50%", background: palette.sage, color: "#fff", fontFamily: f.ui, fontWeight: 700, fontSize: 15 * u, display: "flex", alignItems: "center", justifyContent: "center" }}>YB</div>
+              <div style={{ fontFamily: f.ui, fontWeight: 500, fontSize: 15 * u, color: palette.sub }}>Yoshua Bengio</div>
+            </div>
+          </div>
+          {/* content area — the real Insights screen as the content column */}
+          <div style={{ flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
+            <div style={{ width: colW, height: colH, overflow: "hidden", background: "#000", boxShadow: `inset 0 0 0 1px ${sh(0.06)}` }}>
+              <Img src={screenSrc(screen, device, L)} style={{ width: "100%", display: "block", transform: `scale(${scale})`, transformOrigin: "top center" }} />
+            </div>
           </div>
         </div>
       </div>
@@ -318,7 +320,7 @@ export const DeviceCluster: React.FC = () => {
   const { fps } = useVideoConfig();
   const landscape = width > height;
   const base = landscape ? height : height * 0.62;
-  const macW = base * (landscape ? 0.95 : 1.0);
+  const macW = base * (landscape ? 0.84 : 0.92);
   const padW = macW * 0.34;
   const phoneW = macW * 0.2;
 
@@ -333,15 +335,15 @@ export const DeviceCluster: React.FC = () => {
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "relative", width: macW * 1.2, height: base }}>
         {/* Mac — back/center */}
-        <div style={{ position: "absolute", left: "50%", top: "42%", transform: `translate(-50%,-50%) translateY(${interpolate(mac, [0, 1], [40, 0]) + fMac}px) scale(${interpolate(mac, [0, 1], [0.96, 1])})`, opacity: mac, zIndex: 1 }}>
+        <div style={{ position: "absolute", left: "50%", top: "53%", transform: `translate(-50%,-50%) translateY(${interpolate(mac, [0, 1], [40, 0]) + fMac}px) scale(${interpolate(mac, [0, 1], [0.96, 1])})`, opacity: mac, zIndex: 1 }}>
           <MacFrame screen="insights" device="ipad" width={macW} />
         </div>
         {/* iPad — front-left */}
-        <div style={{ position: "absolute", left: "30%", top: "62%", transform: `translate(-50%,-50%) translateY(${interpolate(pad, [0, 1], [54, 0]) + fPad}px) scale(${interpolate(pad, [0, 1], [0.94, 1])})`, opacity: pad, zIndex: 2 }}>
+        <div style={{ position: "absolute", left: "30%", top: "71%", transform: `translate(-50%,-50%) translateY(${interpolate(pad, [0, 1], [54, 0]) + fPad}px) scale(${interpolate(pad, [0, 1], [0.94, 1])})`, opacity: pad, zIndex: 2 }}>
           <PadFrame screen="charts" width={padW} />
         </div>
         {/* iPhone — front-right, closest */}
-        <div style={{ position: "absolute", left: "70%", top: "66%", transform: `translate(-50%,-50%) translateY(${interpolate(phone, [0, 1], [64, 0]) + fPhone}px) scale(${interpolate(phone, [0, 1], [0.92, 1])})`, opacity: phone, zIndex: 3 }}>
+        <div style={{ position: "absolute", left: "70%", top: "75%", transform: `translate(-50%,-50%) translateY(${interpolate(phone, [0, 1], [64, 0]) + fPhone}px) scale(${interpolate(phone, [0, 1], [0.92, 1])})`, opacity: phone, zIndex: 3 }}>
           <PhoneFrame screen="dashboard" width={phoneW} />
         </div>
       </div>
