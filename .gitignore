@@ -121,3 +121,5 @@ test_output/
 # Logs
 *.log
 logs/
+marketing/promo/out/
+marketing/promo/node_modules/

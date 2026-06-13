@@ -1,0 +1,22 @@
+{
+  "name": "citetrack-promo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "remotion render Promo out/promo.mp4",
+    "render-square": "remotion render PromoSquare out/promo-square.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.380",
+    "@remotion/google-fonts": "4.0.380",
+    "@remotion/transitions": "4.0.380",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.380"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "typescript": "5.7.3"
+  }
+}

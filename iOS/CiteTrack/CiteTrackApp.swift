@@ -118,6 +118,12 @@ struct CiteTrackApp: App {
     init() {
         NSLog("🧪 [CiteTrackApp] init called - app is starting up")
 
+        #if DEBUG
+        // Promo screenshot harness: seed signed-in user + demo scholars + history
+        // and route straight to a real screen when launched with -PromoShot.
+        if PromoHarness.isActive { PromoHarness.bootstrap() }
+        #endif
+
         // Firebase Analytics + Crashlytics
         #if canImport(FirebaseCore)
         FirebaseApp.configure()
@@ -178,6 +184,24 @@ struct CiteTrackApp: App {
     
     var body: some Scene {
         WindowGroup {
+            #if DEBUG
+            if PromoHarness.isActive, let s = PromoHarness.screen {
+                PromoRouter(screen: s)
+                    .preferredColorScheme(colorScheme)
+                    .environmentObject(dataManager)
+                    .environmentObject(localizationManager)
+                    .id(localizationManager.currentLanguage.rawValue)
+            } else {
+                mainScene
+            }
+            #else
+            mainScene
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private var mainScene: some View {
             MainView()
                 .preferredColorScheme(colorScheme)
                 .environmentObject(dataManager)
@@ -232,8 +256,7 @@ struct CiteTrackApp: App {
                         // off-main before re-enabling.)
                     }
                 }
-        }
-        .onChange(of: scenePhase) { _, newPhase in
+                .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 AnalyticsService.shared.log(AnalyticsEventName.appForeground)
                 AnalyticsService.shared.processWidgetEvents()
@@ -4748,3 +4771,151 @@ private struct HeatmapBlockSelectionEffect: ViewModifier {
             .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0), value: isSelected)
     }
 }
+
+#if DEBUG
+// MARK: - Promo screenshot harness (DEBUG only)
+// Launched with: -PromoShot <screen> [-PromoLang en|zh] [-PromoScholar <id>]
+// Seeds a signed-in user + real famous scholars (Bengio/Hinton/LeCun) + a rich
+// citation-history series, then routes straight to a real production screen so we
+// can capture genuine app UI headlessly via `simctl io screenshot` (no taps).
+enum PromoHarness {
+    static var args: [String] { ProcessInfo.processInfo.arguments }
+    static var isActive: Bool { args.contains("-PromoShot") }
+
+    private static func arg(_ flag: String) -> String? {
+        guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
+        return args[i + 1]
+    }
+
+    static var screen: String? { arg("-PromoShot") }
+    static var scholarId: String { arg("-PromoScholar") ?? "kukA0LcAAAAJ" }
+    static var lang: String { arg("-PromoLang") ?? "en" }
+
+    static var demoScholar: Scholar {
+        var s = Scholar(id: scholarId, name: "Yoshua Bengio")
+        s.citations = 963_124
+        s.lastUpdated = Date()
+        return s
+    }
+
+    static func bootstrap() {
+        // 1) Language
+        LocalizationManager.shared.currentLanguage = (lang == "zh") ? .chinese : .english
+
+        // 2) Signed-in user (unlock Insights)
+        GoogleAuthService.shared.currentUser = GoogleUser(
+            id: "promo_user",
+            email: "yoshua.bengio@mila.quebec",
+            displayName: "Yoshua Bengio",
+            photoURL: nil
+        )
+        GoogleAuthService.shared.isSignedIn = true
+        UserDefaults.standard.set(scholarId, forKey: "ConfirmedMyScholarId")
+
+        // 3) Real famous scholars (Bengio / Hinton / LeCun)
+        func sch(_ id: String, _ name: String, _ c: Int) -> Scholar {
+            var s = Scholar(id: id, name: name); s.citations = c; s.lastUpdated = Date(); return s
+        }
+        DataManager.shared.scholars = [
+            sch(scholarId, "Yoshua Bengio", 963_124),
+            sch("JicYPdAAAAAJ", "Geoffrey Hinton", 901_356),
+            sch("WLN3QrAAAAAJ", "Yann LeCun", 412_889),
+        ]
+
+        // 4) Rich citation-history series for the growth chart (real-looking ramp).
+        seedHistory()
+    }
+
+    private static func seedHistory() {
+        let ud = UserDefaults(suiteName: appGroupIdentifier) ?? .standard
+        let now = Date()
+        var history: [CitationHistory] = []
+        // Bengio: 26 weekly points ramping 882k → 963k
+        let series: [(String, Int, Int)] = [
+            (scholarId, 882_000, 963_124),
+            ("JicYPdAAAAAJ", 838_000, 901_356),
+            ("WLN3QrAAAAAJ", 360_000, 412_889),
+        ]
+        for (sid, start, end) in series {
+            let weeks = 26
+            for w in 0...weeks {
+                let t = now.addingTimeInterval(-Double(weeks - w) * 7 * 86_400)
+                // ease-out ramp so it looks like real accelerating growth
+                let p = Double(w) / Double(weeks)
+                let eased = 1 - pow(1 - p, 1.7)
+                let value = Int(Double(start) + (Double(end - start)) * eased)
+                history.append(CitationHistory(scholarId: sid, citationCount: value, timestamp: t))
+            }
+        }
+        if let data = try? JSONEncoder().encode(history) {
+            ud.set(data, forKey: "CitationHistoryData")
+            UserDefaults.standard.set(data, forKey: "CitationHistoryData")
+        }
+    }
+}
+
+// Routes a -PromoShot value to the matching PRODUCTION view, pre-navigated.
+struct PromoRouter: View {
+    let screen: String
+    @ObservedObject private var lm = LocalizationManager.shared
+
+    var body: some View {
+        Group {
+            switch screen {
+            case "dashboard":
+                DashboardView()
+            case "scholars":
+                NewScholarView()
+            case "charts":
+                NavigationView {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: GlassMetrics.cardSpacing) {
+                            GlassCard {
+                                ScholarsGrowthLineChartView()
+                                    .environmentObject(DataManager.shared)
+                                    .environmentObject(lm)
+                                    .frame(minHeight: 460, maxHeight: 480)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    }
+                    .liquidGlassCanvas()
+                    .navigationTitle(lm.localized("charts"))
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+                .navigationViewStyle(.stack)
+            case "insights":
+                CitationInsightsView()
+            case "insights_result":
+                NavigationView {
+                    ScrollView {
+                        AnalysisInsightsSection(
+                            scholar: PromoHarness.demoScholar,
+                            publications: [],
+                            citingPapers: [],
+                            autoRun: true
+                        )
+                        .padding()
+                    }
+                    .liquidGlassCanvas()
+                    .navigationTitle(lm.localized("citation_insights"))
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+                .navigationViewStyle(.stack)
+            case "score":
+                NavigationView {
+                    HaiyouScoreView(scholarId: PromoHarness.scholarId, scholarName: "Yoshua Bengio")
+                }
+                .navigationViewStyle(.stack)
+            case "whocited":
+                WhoCiteMeView(scholar: PromoHarness.demoScholar)
+            default:
+                DashboardView()
+            }
+        }
+        .environmentObject(DataManager.shared)
+        .environmentObject(lm)
+    }
+}
+#endif
