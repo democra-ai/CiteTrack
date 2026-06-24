@@ -830,6 +830,7 @@ private struct VenueCitingPapersView: View {
                 }
             }
             .padding(GlassMetrics.screenPadding)
+            .iPadReadableWidth()
         }
         .liquidGlassCanvas()
         .navigationTitle(venue.name)
@@ -881,6 +882,7 @@ private struct ResearchDirectionDetailView: View {
                 }
             }
             .padding(GlassMetrics.screenPadding)
+            .iPadReadableWidth()
         }
         .liquidGlassCanvas()
         .navigationTitle(direction.label)
@@ -937,6 +939,7 @@ private struct NotableCiterDetailView: View {
                 }
             }
             .padding(GlassMetrics.screenPadding)
+            .iPadReadableWidth()
         }
         .liquidGlassCanvas()
         .navigationTitle(citer.name)
@@ -1008,6 +1011,7 @@ private struct CitingInstitutionDetailView: View {
                 }
             }
             .padding(GlassMetrics.screenPadding)
+            .iPadReadableWidth()
         }
         .liquidGlassCanvas()
         .navigationTitle(institution.name)
@@ -1059,6 +1063,7 @@ private struct TopCitedPaperDetailView: View {
                 }
             }
             .padding(GlassMetrics.screenPadding)
+            .iPadReadableWidth()
         }
         .liquidGlassCanvas()
         .navigationTitle(lm.localized("analysis_paper_detail_title", fallback: "Citing paper"))

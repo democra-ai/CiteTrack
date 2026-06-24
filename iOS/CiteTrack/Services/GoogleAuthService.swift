@@ -27,12 +27,41 @@ public class GoogleAuthService: ObservableObject {
     }
 
     /// Check whether GIDClientID is configured in Info.plist before touching the SDK
-    private static var hasGIDClientID: Bool {
+    static var hasGIDClientID: Bool {
         guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String,
               !clientID.isEmpty else {
             return false
         }
         return true
+    }
+
+    /// Whether real Google Sign-In is wired up. When false, the Agent features stay
+    /// locked in Release (no silent mock session); DEBUG builds may use a mock for testing.
+    public static var isConfigured: Bool { hasGIDClientID }
+
+    #if DEBUG
+    /// Dev-only mock session, used on simulators / when no OAuth client is configured.
+    private func signInMockUser() {
+        let mock = GoogleUser(
+            id: "dev_mock_user",
+            email: "researcher@university.edu",
+            displayName: "Demo Researcher",
+            photoURL: nil
+        )
+        currentUser = mock
+        isSignedIn = true
+        persist(mock)
+    }
+    #endif
+
+    /// Shown when the user taps sign-in but no OAuth client is configured (Release).
+    private func reportNotConfigured() {
+        isLoading = false
+        errorMessage = NSLocalizedString(
+            "google_signin_unavailable",
+            value: "Google Sign-In is temporarily unavailable. Please try again later.",
+            comment: "Shown when the Google OAuth client is not yet configured"
+        )
     }
 
     // MARK: - Sign In
@@ -42,16 +71,12 @@ public class GoogleAuthService: ObservableObject {
 
         #if canImport(GoogleSignIn)
         guard Self.hasGIDClientID else {
-            // Fall through to mock path when GIDClientID is not configured
-            let mock = GoogleUser(
-                id: "dev_mock_user",
-                email: "researcher@university.edu",
-                displayName: "Demo Researcher",
-                photoURL: nil
-            )
-            currentUser = mock
-            isSignedIn = true
-            persist(mock)
+            // No OAuth client configured. Mock only in DEBUG; Release locks the feature.
+            #if DEBUG
+            signInMockUser()
+            #else
+            reportNotConfigured()
+            #endif
             return
         }
         isLoading = true
@@ -69,16 +94,12 @@ public class GoogleAuthService: ObservableObject {
             }
         }
         #else
-        // Development fallback when GoogleSignIn SDK is not yet linked
-        let mock = GoogleUser(
-            id: "dev_mock_user",
-            email: "researcher@university.edu",
-            displayName: "Demo Researcher",
-            photoURL: nil
-        )
-        currentUser = mock
-        isSignedIn = true
-        persist(mock)
+        // GoogleSignIn SDK not linked: mock only in DEBUG, lock in Release.
+        #if DEBUG
+        signInMockUser()
+        #else
+        reportNotConfigured()
+        #endif
         #endif
     }
 
@@ -132,6 +153,13 @@ public class GoogleAuthService: ObservableObject {
         guard let data = UserDefaults.standard.data(forKey: persistenceKey),
               let user = try? JSONDecoder().decode(GoogleUser.self, from: data)
         else { return }
+        #if !DEBUG
+        // Never let a stale dev-mock session survive into a production build.
+        if user.id == "dev_mock_user" {
+            UserDefaults.standard.removeObject(forKey: persistenceKey)
+            return
+        }
+        #endif
         currentUser = user
         isSignedIn = true
     }

@@ -413,6 +413,7 @@ struct CitationInsightsView: View {
                 }
             }
             .padding(GlassMetrics.screenPadding)
+            .iPadReadableWidth()
         }
         .liquidGlassCanvas()
         .confirmationDialog(

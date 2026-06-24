@@ -73,11 +73,18 @@ public final class GoogleAuthService: NSObject, ObservableObject {
 
     // MARK: - Sign In
 
+    /// Whether real Google Sign-In is wired up (an OAuth client id is configured).
+    public static var isConfigured: Bool {
+        GoogleAuthService.shared.clientID != nil
+    }
+
     public func signIn() {
         errorMessage = nil
 
         guard let clientID = clientID, let scheme = redirectScheme else {
-            // Mock fallback (mirrors iOS when no client id is configured).
+            // No OAuth client configured. Mock only in DEBUG; Release locks the feature
+            // so production never silently fakes a session.
+            #if DEBUG
             let mock = GoogleUser(
                 id: "dev_mock_user",
                 email: "researcher@university.edu",
@@ -87,6 +94,9 @@ public final class GoogleAuthService: NSObject, ObservableObject {
             currentUser = mock
             isSignedIn = true
             persist(mock)
+            #else
+            errorMessage = "Google Sign-In is temporarily unavailable. Please try again later."
+            #endif
             return
         }
 
@@ -209,6 +219,13 @@ public final class GoogleAuthService: NSObject, ObservableObject {
         guard let data = UserDefaults.standard.data(forKey: persistenceKey),
               let user = try? JSONDecoder().decode(GoogleUser.self, from: data)
         else { return }
+        #if !DEBUG
+        // Never let a stale dev-mock session survive into a production build.
+        if user.id == "dev_mock_user" {
+            UserDefaults.standard.removeObject(forKey: persistenceKey)
+            return
+        }
+        #endif
         currentUser = user
         isSignedIn = true
     }

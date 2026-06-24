@@ -2838,6 +2838,31 @@ enum GlassMetrics {
     static let cardPadding: CGFloat = 18
     static let cardSpacing: CGFloat = 16
     static let screenPadding: CGFloat = 16
+    /// On iPad / wide layouts, cap the content column so cards and text don't
+    /// stretch edge-to-edge (which makes lines hard to read and wastes the canvas).
+    static let readableContentWidth: CGFloat = 760
+}
+
+// MARK: - iPad readable width
+/// Centers content in a readable column on regular-width (iPad / large) layouts,
+/// while staying full-width on compact (iPhone). Apply to the VStack inside a
+/// ScrollView so the scroll surface itself still fills the screen.
+private struct ReadableWidthModifier: ViewModifier {
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    func body(content: Content) -> some View {
+        if sizeClass == .regular {
+            content
+                .frame(maxWidth: GlassMetrics.readableContentWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// See `ReadableWidthModifier`. No-op on iPhone, centers a max-width column on iPad.
+    func iPadReadableWidth() -> some View { modifier(ReadableWidthModifier()) }
 }
 
 extension View {

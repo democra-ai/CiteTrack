@@ -163,6 +163,77 @@ struct SignedInUserBadge: View {
     }
 }
 
+// MARK: - Agent Sign-In Gate
+/// Reusable wrapper that hard-gates an "Agent" (AI-powered) feature behind Google
+/// sign-in. While signed out it shows a clean prompt with a Google sign-in button;
+/// once signed in it renders `content`. Because `content` is only built when signed
+/// in, any data-loading `.onAppear`/`.task` inside it will not fire until the user
+/// has authenticated — exactly the gating the product requires.
+struct AgentSignInGate<Content: View>: View {
+    @StateObject private var auth = GoogleAuthService.shared
+    @State private var showSignIn = false
+
+    let icon: String
+    let title: String
+    let subtitle: String
+    let desc: String
+    @ViewBuilder let content: () -> Content
+
+    init(
+        icon: String = "sparkles",
+        title: String,
+        subtitle: String,
+        desc: String,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.icon = icon
+        self.title = title
+        self.subtitle = subtitle
+        self.desc = desc
+        self.content = content
+    }
+
+    var body: some View {
+        Group {
+            if auth.isSignedIn {
+                content()
+            } else {
+                gate
+            }
+        }
+        .sheet(isPresented: $showSignIn) {
+            GoogleSignInView()
+        }
+    }
+
+    private var gate: some View {
+        VStack(spacing: 32) {
+            Spacer()
+            Image(systemName: icon)
+                .font(.system(size: 70, weight: .ultraLight))
+                .foregroundStyle(
+                    LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.title2).fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                Text(subtitle)
+                    .font(.subheadline).foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            Text(desc)
+                .font(.body).foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            GoogleSignInButton { showSignIn = true }
+                .padding(.horizontal, 40)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 // MARK: - Preview
 #Preview {
     GoogleSignInView()

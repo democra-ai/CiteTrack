@@ -323,6 +323,19 @@ struct WhoCiteMeView: View {
     }
 
     var body: some View {
+        // Agent feature: gated behind Google sign-in. The data-loading modifiers below
+        // live on `gatedContent`, so they only run once the user is signed in.
+        AgentSignInGate(
+            icon: "quote.bubble",
+            title: "who_cite_me".localized,
+            subtitle: "whocited_signin_subtitle".localized,
+            desc: "whocited_signin_desc".localized
+        ) {
+            gatedContent
+        }
+    }
+
+    private var gatedContent: some View {
         mainContent
         .onAppear {
             if let embedded = embeddedScholar {
@@ -700,6 +713,7 @@ struct WhoCiteMeView: View {
                     .liquidGlassCard(cornerRadius: 22)
             }
             .padding()
+            .iPadReadableWidth()
         }
         .refreshable {
             await refreshData(for: scholar)
