@@ -264,12 +264,14 @@ public class CitationManager: ObservableObject {
                 self.hasMorePublications[scholarId] = true
                 self.isLoading = true
                 
-                // 直接 Fetch，跳过缓存检查
+                // 直接 Fetch，强制绕过缓存去重（否则缓存已热时下拉刷新/更新按钮会被
+                // 协调器静默丢弃，导致引用数与增长徽标最长 7 天不更新）。
                 await fetchCoordinator.fetchScholarProfilePage(
                     scholarId: scholarId,
                     sortBy: effectiveSortBy,
                     startIndex: 0,
-                    priority: .high
+                    priority: .high,
+                    forceRefresh: true
                 )
             } else {
                 // 非强制刷新：优先检查对应排序的缓存

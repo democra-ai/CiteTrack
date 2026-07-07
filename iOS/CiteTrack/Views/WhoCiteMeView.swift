@@ -728,16 +728,19 @@ struct WhoCiteMeView: View {
         // 使用 refreshTrigger 来触发视图刷新
         let _ = refreshTrigger.value
         
-        // 直接使用从 Google Scholar 获取的已排序数据
-        let publications = (citationManager.scholarPublications[scholarId] ?? []).map { pub in
-            PublicationDisplay(
-                id: pub.id,
-                title: pub.title,
-                clusterId: pub.clusterId,
-                citationCount: pub.citationCount,
-                year: pub.year
-            )
-        }
+        // 客户端确定性排序：Scholar 主页只支持 sortby=pubdate，title/total 会被忽略，
+        // 因此不依赖服务端顺序，直接在内存里按当前排序键排序，瞬时且不会失败。
+        let publications = sortedPublications(
+            (citationManager.scholarPublications[scholarId] ?? []).map { pub in
+                PublicationDisplay(
+                    id: pub.id,
+                    title: pub.title,
+                    clusterId: pub.clusterId,
+                    citationCount: pub.citationCount,
+                    year: pub.year
+                )
+            }
+        )
         
         let changes = citationManager.publicationChanges[scholarId]
         
@@ -1024,27 +1027,15 @@ struct WhoCiteMeView: View {
         Menu {
             ForEach(PublicationSortOption.allCases, id: \.self) { option in
                 Button(action: {
-                    // 切换排序选项
-                    // 如果切换的是不同的排序，立即清空显示，然后 Fetch
-                    if sortOption != option {
-                        sortOption = option
-                        
-                        // 立即清空当前显示，避免显示错误排序的数据
-                        citationManager.scholarPublications[scholarId] = []
-                        
-                        // 重新请求数据（使用 Google Scholar 的排序参数）
-                        let sortParam = option.googleScholarParam ?? "total"
-                        citationManager.fetchScholarPublications(
-                            for: scholarId,
-                            sortBy: sortParam,
-                            forceRefresh: false
-                        )
-                    }
+                    // 客户端排序：只更新排序键。视图立即用已加载的本地数据重新排序，
+                    // 不清空列表、不发起网络请求，从而消除排序失败与闪烁。
+                    // （Google Scholar 主页仅支持 sortby=pubdate，title/total 会被服务端忽略。）
+                    sortOption = option
                 }) {
                     HStack {
                         Image(systemName: option.icon)
                         Text(option.title)
-                        
+
                         if sortOption == option {
                             Spacer()
                             Image(systemName: "checkmark")
@@ -1055,7 +1046,28 @@ struct WhoCiteMeView: View {
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
-        .disabled(citationManager.isLoading)
+    }
+
+    /// Client-side deterministic sort of the already-loaded publications.
+    /// Scholar profile pages ignore sortby=title/total, so we never rely on the
+    /// server order — sorting happens purely in memory and is instant.
+    private func sortedPublications(_ publications: [PublicationDisplay]) -> [PublicationDisplay] {
+        switch sortOption {
+        case .citations:
+            return publications.sorted {
+                let l = $0.citationCount ?? -1, r = $1.citationCount ?? -1
+                if l != r { return l > r }
+                return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+            }
+        case .year:
+            return publications.sorted {
+                let l = $0.year ?? Int.min, r = $1.year ?? Int.min
+                if l != r { return l > r }
+                return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+            }
+        case .title:
+            return publications.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
     }
     
     // 内联排序按钮（显示在列表标题右侧）- 已废弃，保留以防需要
@@ -1283,18 +1295,20 @@ struct WhoCiteMeView: View {
             
             await MainActor.run {
                 isLoadingCitingPapers = false
-                
-                if success {
-                    // 从缓存获取数据
-                    let cacheService = CitationCacheService.shared
-                    if let papers = cacheService.getCachedCitingPapersList(for: clusterId, sortByDate: citingPapersSortByDate, startIndex: 0) {
-                        citingPapers = papers
-                        hasMoreCitingPapers = papers.count >= 10
-                        // 不再显示错误，即使数据为空也只显示空状态
-                    }
-                    // 如果缓存为空，也不显示错误，只显示空状态
+
+                if success,
+                   let papers = CitationCacheService.shared.getCachedCitingPapersList(for: clusterId, sortByDate: citingPapersSortByDate, startIndex: 0),
+                   !papers.isEmpty {
+                    // 抓取成功且拿到数据
+                    citingPapers = papers
+                    hasMoreCitingPapers = papers.count >= 10
+                } else if (publication.citationCount ?? 0) > 0 {
+                    // 论文声称有引用，却没抓到任何引用文章 → 抓取失败 / 被反爬限流，
+                    // 而不是真的没有。显示「加载失败 + 重试 / 浏览器打开」，而不是
+                    // 误导性的「未查找到引用文章」——这正是用户报告的 bug。
+                    citingPapersError = "anti_bot_restriction_message".localized
                 }
-                // 如果获取失败，也不显示错误，让用户看到空状态和重试按钮
+                // 否则（citationCount 为 0/nil 且为空）：确实没有引用文章，显示空状态。
             }
         }
     }

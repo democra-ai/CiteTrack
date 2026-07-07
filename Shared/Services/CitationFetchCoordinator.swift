@@ -169,11 +169,13 @@ public class CitationFetchCoordinator: ObservableObject {
         scholarId: String,
         sortBy: String = "total",
         startIndex: Int = 0,
-        priority: FetchPriority = .high
+        priority: FetchPriority = .high,
+        forceRefresh: Bool = false
     ) async -> Bool {
-        print("📄 [FetchCoordinator] Fetch Scholar Profile Page: \(scholarId), sortBy: \(sortBy), startIndex: \(startIndex)")
-        
-        addTask(.scholarProfile(scholarId: scholarId, sortBy: sortBy, startIndex: startIndex), priority: priority)
+        print("📄 [FetchCoordinator] Fetch Scholar Profile Page: \(scholarId), sortBy: \(sortBy), startIndex: \(startIndex), forceRefresh: \(forceRefresh)")
+
+        // 强制刷新时绕过缓存去重，确保下拉刷新/更新按钮真正重新抓取（否则缓存热时任务被静默丢弃）。
+        addTask(.scholarProfile(scholarId: scholarId, sortBy: sortBy, startIndex: startIndex), priority: priority, bypassCache: forceRefresh)
         
         // 如果是第一页，立即处理（包含学者信息）
         if startIndex == 0 {
@@ -200,10 +202,19 @@ public class CitationFetchCoordinator: ObservableObject {
         priority: FetchPriority = .high
     ) async -> Bool {
         print("📄 [FetchCoordinator] Fetch Cited By Page: \(clusterId), sortByDate: \(sortByDate), startIndex: \(startIndex)")
-        
-        addTask(.citedBy(clusterId: clusterId, sortByDate: sortByDate, startIndex: startIndex), priority: priority)
-        await processQueue()
-        return true
+
+        // 已有「非空」缓存则直接返回，避免重复请求 Google Scholar。
+        // 注意：空缓存不算命中（否则一次失败/空解析会把有引用的论文永久钉死为「无引用」）。
+        if let cached = cacheService.getCachedCitingPapersList(for: clusterId, sortByDate: sortByDate, startIndex: startIndex),
+           !cached.isEmpty {
+            return true
+        }
+
+        // 直接执行并 await 真实结果，返回真实的成功/失败。
+        // 不能只 addTask + processQueue()：当后台已有队列在跑时，processQueue() 因
+        // isProcessingQueue==true 会立即返回，本任务并未真正执行，调用方却拿到 true 并读到空缓存，
+        // 于是明明有引用的论文被误报为「未查找到引用文章」。
+        return await fetchCitedByPageContent(clusterId: clusterId, sortByDate: sortByDate, startIndex: startIndex)
     }
     
     /// Fetch 学者数据（精简版：仅获取第一页，最大化节省 Google Scholar 请求）
@@ -390,22 +401,30 @@ public class CitationFetchCoordinator: ObservableObject {
     // MARK: - Private Methods
     
     /// 添加任务到队列
-    private func addTask(_ type: FetchTaskType, priority: FetchPriority) {
+    /// - Parameter bypassCache: 强制刷新时为 true —— 跳过缓存命中检查并清除「已处理」标记，
+    ///   确保任务真正重新抓取（修复：缓存已热时下拉刷新/更新按钮被静默丢弃、数据 7 天不更新）。
+    private func addTask(_ type: FetchTaskType, priority: FetchPriority, bypassCache: Bool = false) {
         let task = FetchTask(type: type, priority: priority, createdAt: Date())
-        
+
         // 检查是否已在队列中
         if taskQueue.contains(where: { $0.type == type }) {
             print("⏭️ [FetchCoordinator] Task already in queue: \(task.type.identifier)")
             return
         }
-        
-        // 先检查缓存（如果缓存存在，标记为已处理，但不添加到队列）
-        if isCached(type) {
+
+        // 先检查缓存（如果缓存存在，标记为已处理，但不添加到队列）。
+        // bypassCache=true（强制刷新）时跳过此检查，强制重新抓取。
+        if !bypassCache && isCached(type) {
             print("💾 [FetchCoordinator] Task data cached: \(task.type.identifier)")
             processedTasks.insert(task.type.identifier)
             return
         }
-        
+
+        // 强制刷新：清除「已处理」标记，确保之前处理过的任务能重新执行。
+        if bypassCache {
+            processedTasks.remove(task.type.identifier)
+        }
+
         // 如果任务之前被标记为已处理，但缓存不存在，说明数据可能没有正确保存
         // 清除已处理标记，允许重新 Fetch
         if processedTasks.contains(task.type.identifier) {
@@ -470,12 +489,13 @@ public class CitationFetchCoordinator: ObservableObject {
             }
             
         case .citedBy(let clusterId, let sortByDate, let startIndex):
-            // 引用页面缓存检查
-            return cacheService.getCachedCitingPapersList(
+            // 引用页面缓存检查：把「空结果」视为未缓存，以便重新抓取
+            // （否则历史遗留的空缓存会把有引用的论文永久钉死为「无引用」）。
+            return !(cacheService.getCachedCitingPapersList(
                 for: clusterId,
                 sortByDate: sortByDate,
                 startIndex: startIndex
-            ) != nil
+            )?.isEmpty ?? true)
         }
     }
     
@@ -706,14 +726,17 @@ public class CitationFetchCoordinator: ObservableObject {
                         sortByDate: sortByDate,
                         startIndex: startIndex
                     ) ?? []
-                    
-                    // 缓存数据（如果已有数据，会覆盖；否则新增）
-                    self.cacheService.cacheCitingPapersList(
-                        papers,
-                        for: clusterId,
-                        sortByDate: sortByDate,
-                        startIndex: startIndex
-                    )
+
+                    // 只缓存「非空」结果：空结果不写缓存，避免一次瞬时的空解析
+                    // 被永久缓存，把有引用的论文钉死为「无引用」。下次打开会重新抓取。
+                    if !papers.isEmpty {
+                        self.cacheService.cacheCitingPapersList(
+                            papers,
+                            for: clusterId,
+                            sortByDate: sortByDate,
+                            startIndex: startIndex
+                        )
+                    }
                     
                     // 合并统计
                     let sortKey = sortByDate ? "true" : "false"

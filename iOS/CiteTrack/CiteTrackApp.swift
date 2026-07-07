@@ -1343,13 +1343,19 @@ struct NewScholarView: View {
     @State private var activeSheet: SheetType?
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
                 if dataManager.scholars.isEmpty {
                     emptyStateView
                 } else {
                     scholarListView
                 }
+            }
+            // Value-based destination: activation is owned by the NavigationStack path,
+            // not per-link internal state, so badge/DataManager re-renders can no longer
+            // desync push/pop (fixes "tapping a scholar only works once").
+            .navigationDestination(for: Scholar.self) { scholar in
+                WhoCiteMeView(scholar: scholar)
             }
             .alert(iCloudSyncManager.shared.importPromptMessage.isEmpty ? localizationManager.localized("icloud_backup_found") : iCloudSyncManager.shared.importPromptMessage, isPresented: Binding(get: { iCloudSyncManager.shared.showImportPrompt }, set: { iCloudSyncManager.shared.showImportPrompt = $0 })) {
                 Button(localizationManager.localized("cancel")) {
@@ -1454,7 +1460,6 @@ struct NewScholarView: View {
                 }
             )
         }
-        .navigationViewStyle(.stack)
     }
 
     private var emptyStateView: some View {
@@ -1477,10 +1482,7 @@ struct NewScholarView: View {
         List {
 
             ForEach(dataManager.scholarsForList, id: \.id) { scholar in
-                NavigationLink {
-                    // 点进每位学者 → 完整的「谁引用了我」详情（论文列表 + 引用下钻）
-                    WhoCiteMeView(scholar: scholar)
-                } label: {
+                NavigationLink(value: scholar) {
                     ScholarRowWithChartAndManagement(
                         scholar: scholar,
                         onChartTap: {
