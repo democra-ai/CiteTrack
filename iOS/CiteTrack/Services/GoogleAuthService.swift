@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import AuthenticationServices
 #if canImport(GoogleSignIn)
 import GoogleSignIn
 #endif
@@ -101,6 +102,38 @@ public class GoogleAuthService: ObservableObject {
         reportNotConfigured()
         #endif
         #endif
+    }
+
+    // MARK: - Sign In with Apple
+    /// Establishes the shared session from a successful Apple authorization. Apple only
+    /// returns email + full name on the FIRST authorization, so we fall back to any
+    /// previously persisted values on subsequent sign-ins. Reuses the GoogleUser model
+    /// as the app's generic "signed-in user" so the gate + every consumer works unchanged.
+    public func handleAppleSignIn(_ authorization: ASAuthorization) {
+        guard let cred = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            errorMessage = NSLocalizedString("apple_signin_failed", value: "Apple Sign-In failed. Please try again.", comment: "")
+            return
+        }
+        let name = [cred.fullName?.givenName, cred.fullName?.familyName]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        let user = GoogleUser(
+            id: cred.user,
+            email: cred.email ?? currentUser?.email ?? "",
+            displayName: name.isEmpty ? (currentUser?.displayName ?? "CiteTrack") : name,
+            photoURL: nil
+        )
+        errorMessage = nil
+        currentUser = user
+        isSignedIn = true
+        persist(user)
+    }
+
+    /// Apple flow error handling — silent on user cancel, message otherwise.
+    public func handleAppleError(_ error: Error) {
+        isLoading = false
+        if let asError = error as? ASAuthorizationError, asError.code == .canceled { return }
+        errorMessage = error.localizedDescription
     }
 
     // MARK: - Sign Out

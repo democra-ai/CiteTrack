@@ -1,7 +1,9 @@
 import SwiftUI
+import AuthenticationServices
 
 // MARK: - Google Sign-In Gate View
-/// Full-screen sign-in sheet. Only Google sign-in is supported.
+/// Full-screen sign-in sheet. Offers Sign in with Apple (always) and Google (only
+/// when a GIDClientID is configured).
 struct GoogleSignInView: View {
     @StateObject private var auth = GoogleAuthService.shared
     @Environment(\.dismiss) private var dismiss
@@ -50,13 +52,13 @@ struct GoogleSignInView: View {
 
                 Spacer().frame(height: 48)
 
-                // Sign-in button
+                // Sign-in button(s)
                 if auth.isLoading {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .padding()
                 } else {
-                    GoogleSignInButton { signIn() }
+                    SignInButtons(onGoogle: { signIn() })
                         .padding(.horizontal, 32)
                 }
 
@@ -132,6 +134,40 @@ struct GoogleSignInButton: View {
             .frame(height: 52)
             .background(Color(red: 0.26, green: 0.52, blue: 0.96))
             .cornerRadius(8)
+        }
+    }
+}
+
+// MARK: - Sign-In Buttons (Apple + optional Google)
+/// The shared sign-in affordance used by every gate. Sign in with Apple is the
+/// primary, always-available method (real, Apple-native, no external config).
+/// The Google button appears only when a GIDClientID is actually configured, so
+/// we never show a non-functional Google button.
+struct SignInButtons: View {
+    @ObservedObject private var auth = GoogleAuthService.shared
+    @Environment(\.colorScheme) private var colorScheme
+    /// Invoked when the user taps the Google button (only shown when configured).
+    var onGoogle: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(spacing: 12) {
+            SignInWithAppleButton(.signIn) { request in
+                request.requestedScopes = [.fullName, .email]
+            } onCompletion: { result in
+                switch result {
+                case .success(let authorization):
+                    auth.handleAppleSignIn(authorization)
+                case .failure(let error):
+                    auth.handleAppleError(error)
+                }
+            }
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+            .frame(height: 50)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            if GoogleAuthService.hasGIDClientID, let onGoogle {
+                GoogleSignInButton(action: onGoogle)
+            }
         }
     }
 }
@@ -226,7 +262,7 @@ struct AgentSignInGate<Content: View>: View {
                 .font(.body).foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
-            GoogleSignInButton { showSignIn = true }
+            SignInButtons(onGoogle: { showSignIn = true })
                 .padding(.horizontal, 40)
             Spacer()
         }

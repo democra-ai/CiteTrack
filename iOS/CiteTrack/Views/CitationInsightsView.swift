@@ -369,9 +369,7 @@ struct CitationInsightsView: View {
                 .font(.body).foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
-            Button(action: { showSignIn = true }) {
-                GoogleSignInButton { showSignIn = true }
-            }
+            SignInButtons(onGoogle: { showSignIn = true })
             .padding(.horizontal, 40)
             Spacer()
         }

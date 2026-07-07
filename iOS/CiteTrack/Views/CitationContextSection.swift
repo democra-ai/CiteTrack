@@ -76,9 +76,7 @@ struct CitationContextSection: View {
                         .font(.caption).foregroundColor(.secondary)
                 }
             }
-            Button(action: { showSignIn = true }) {
-                GoogleSignInButton { showSignIn = true }
-            }
+            SignInButtons(onGoogle: { showSignIn = true })
         }
         .padding(14)
         .background(Color(.systemGray6))
