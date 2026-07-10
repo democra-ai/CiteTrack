@@ -1,30 +1,95 @@
 import Foundation
 import UIKit
 import AuthenticationServices
+import CryptoKit
+import Security
 #if canImport(GoogleSignIn)
 import GoogleSignIn
 #endif
 
+// MARK: - Keychain (session bearer token)
+/// The bearer token is a full-account credential, so it lives in the Keychain —
+/// never UserDefaults (plaintext plist, included in backups). `ThisDeviceOnly`
+/// keeps it out of iCloud/device-transfer backups; `AfterFirstUnlock` lets the
+/// fire-and-forget sign-out revoke run from the background.
+enum AuthTokenStore {
+    private static let service = "ai.democra.citetrack.auth"
+    private static let account = "session_bearer_token"
+
+    private static func baseQuery() -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: account]
+    }
+
+    static func save(_ token: String) {
+        var q = baseQuery()
+        SecItemDelete(q as CFDictionary)
+        q[kSecValueData as String] = Data(token.utf8)
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        SecItemAdd(q as CFDictionary, nil)
+    }
+
+    static func read() -> String? {
+        var q = baseQuery()
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess,
+              let data = out as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func delete() {
+        SecItemDelete(baseQuery() as CFDictionary)
+    }
+}
+
 // MARK: - Google Auth Service
-/// Handles Google Sign-In flow. Only Google sign-in is supported per product requirements.
-/// Uses GoogleSignIn-iOS SDK when available; provides a clean mock path for simulators.
-public class GoogleAuthService: ObservableObject {
+/// Handles the app's sign-in session (Google, Apple). Google sign-in resolves in
+/// priority order: native GoogleSignIn SDK (when a GIDClientID is configured) →
+/// web OAuth through our own auth service (auth.democra.ai, when its Google
+/// provider is configured) → DEBUG-only mock.
+public final class GoogleAuthService: NSObject, ObservableObject {
     public static let shared = GoogleAuthService()
 
     @Published public var currentUser: GoogleUser? = nil
     @Published public var isSignedIn: Bool = false
     @Published public var isLoading: Bool = false
     @Published public var errorMessage: String? = nil
+    /// Whether auth.democra.ai has its Google provider configured (probed at launch;
+    /// cached so the button state is stable across launches). When this flips on
+    /// server-side, the Google button appears without an app update.
+    @Published public var serverGoogleAvailable: Bool = false
 
     private let persistenceKey = "CiteTrack_GoogleUser_v1"
+    /// Legacy location; migrated into the Keychain on first launch after upgrade.
+    private let legacyBearerTokenKey = "CiteTrack_AuthBearerToken_v1"
+    private let serverGoogleKey = "CiteTrack_ServerGoogleAvailable_v1"
+    private static let authBase = URL(string: "https://auth.democra.ai")!
+    private static let appScheme = "citetrack"
+    private var webAuthSession: ASWebAuthenticationSession?
+    private var pendingOAuthState: String?
+    private var pendingCodeVerifier: String?
 
-    private init() {
+    private override init() {
+        super.init()
+        serverGoogleAvailable = UserDefaults.standard.bool(forKey: serverGoogleKey)
+        migrateLegacyBearerToken()
         restorePersistedUser()
         #if canImport(GoogleSignIn)
         if Self.hasGIDClientID {
             restorePreviousSession()
         }
         #endif
+        probeServerProviders()
+    }
+
+    /// One-time move of any pre-Keychain token out of UserDefaults.
+    private func migrateLegacyBearerToken() {
+        guard let legacy = UserDefaults.standard.string(forKey: legacyBearerTokenKey) else { return }
+        AuthTokenStore.save(legacy)
+        UserDefaults.standard.removeObject(forKey: legacyBearerTokenKey)
     }
 
     /// Check whether GIDClientID is configured in Info.plist before touching the SDK
@@ -36,9 +101,10 @@ public class GoogleAuthService: ObservableObject {
         return true
     }
 
-    /// Whether real Google Sign-In is wired up. When false, the Agent features stay
-    /// locked in Release (no silent mock session); DEBUG builds may use a mock for testing.
-    public static var isConfigured: Bool { hasGIDClientID }
+    /// Whether real Google Sign-In is wired up (native SDK or via our auth service).
+    /// When false, the Agent features stay locked in Release (no silent mock session);
+    /// DEBUG builds may use a mock for testing.
+    public static var isConfigured: Bool { hasGIDClientID || shared.serverGoogleAvailable }
 
     #if DEBUG
     /// Dev-only mock session, used on simulators / when no OAuth client is configured.
@@ -72,12 +138,8 @@ public class GoogleAuthService: ObservableObject {
 
         #if canImport(GoogleSignIn)
         guard Self.hasGIDClientID else {
-            // No OAuth client configured. Mock only in DEBUG; Release locks the feature.
-            #if DEBUG
-            signInMockUser()
-            #else
-            reportNotConfigured()
-            #endif
+            // No native OAuth client — try the web flow via our auth service.
+            signInFallback()
             return
         }
         isLoading = true
@@ -95,13 +157,176 @@ public class GoogleAuthService: ObservableObject {
             }
         }
         #else
-        // GoogleSignIn SDK not linked: mock only in DEBUG, lock in Release.
+        // GoogleSignIn SDK not linked — try the web flow via our auth service.
+        signInFallback()
+        #endif
+    }
+
+    /// No native GIDClientID: web OAuth through auth.democra.ai when its Google
+    /// provider is live; otherwise DEBUG-only mock / a clear "unavailable" error.
+    private func signInFallback() {
+        if serverGoogleAvailable { signInGoogleWeb(); return }
         #if DEBUG
         signInMockUser()
         #else
         reportNotConfigured()
         #endif
-        #endif
+    }
+
+    // MARK: - Web OAuth via our auth service (auth.democra.ai)
+
+    /// Ask the auth service which providers are configured; the Google button
+    /// follows this, so enabling Google server-side lights it up in the shipped app.
+    private func probeServerProviders() {
+        let url = Self.authBase.appendingPathComponent("providers")
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let self,
+                  let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let providers = json["providers"] as? [String: Bool]
+            else { return }
+            DispatchQueue.main.async {
+                self.serverGoogleAvailable = providers["google"] ?? false
+                UserDefaults.standard.set(self.serverGoogleAvailable, forKey: self.serverGoogleKey)
+            }
+        }.resume()
+    }
+
+    // MARK: PKCE helpers
+
+    private static func randomURLSafe(_ byteCount: Int = 32) -> String {
+        var bytes = [UInt8](repeating: 0, count: byteCount)
+        _ = SecRandomCopyBytes(kSecRandomDefault, byteCount, &bytes)
+        return base64URL(Data(bytes))
+    }
+
+    private static func base64URL(_ data: Data) -> String {
+        data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func codeChallenge(for verifier: String) -> String {
+        base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
+    }
+
+    /// Google sign-in through our own auth service — no Google SDK, no GIDClientID
+    /// in the app. ASWebAuthenticationSession → auth.democra.ai/mobile/oauth/start
+    /// (server holds the Google client) → citetrack://auth?code=…&state=… → the code
+    /// is redeemed over POST with the PKCE verifier, so the session token never
+    /// travels in a URL and an intercepted code is useless without the verifier.
+    private func signInGoogleWeb() {
+        let state = Self.randomURLSafe(16)
+        let verifier = Self.randomURLSafe(64)
+        pendingOAuthState = state
+        pendingCodeVerifier = verifier
+
+        var comps = URLComponents(url: Self.authBase.appendingPathComponent("mobile/oauth/start"),
+                                  resolvingAgainstBaseURL: false)!
+        comps.queryItems = [
+            URLQueryItem(name: "provider", value: "google"),
+            URLQueryItem(name: "scheme", value: Self.appScheme),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "code_challenge", value: Self.codeChallenge(for: verifier)),
+        ]
+
+        isLoading = true
+        let session = ASWebAuthenticationSession(url: comps.url!, callbackURLScheme: Self.appScheme) { [weak self] callbackURL, error in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                // Consume the one-shot flow state on EVERY exit path (cancel, error,
+                // mismatch, success) — the nonce and verifier are single-use.
+                self.webAuthSession = nil
+                let expectedState = self.pendingOAuthState
+                let verifier = self.pendingCodeVerifier
+                self.pendingOAuthState = nil
+                self.pendingCodeVerifier = nil
+
+                if let asError = error as? ASWebAuthenticationSessionError, asError.code == .canceledLogin {
+                    self.isLoading = false
+                    return
+                }
+                guard let callbackURL,
+                      let items = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.queryItems
+                else {
+                    self.isLoading = false
+                    self.errorMessage = error?.localizedDescription ?? "Sign-in was not completed."
+                    return
+                }
+                let value = { (name: String) in items.first(where: { $0.name == name })?.value }
+                guard let expectedState, value("state") == expectedState else {
+                    self.isLoading = false
+                    self.errorMessage = "Sign-in state mismatch. Please try again."
+                    return
+                }
+                guard let code = value("code"), !code.isEmpty, let verifier else {
+                    self.isLoading = false
+                    self.errorMessage = "Sign-in failed (\(value("error") ?? "no session")). Please try again."
+                    return
+                }
+                self.exchangeCodeForToken(code: code, verifier: verifier)
+            }
+        }
+        session.presentationContextProvider = self
+        // Ephemeral: nothing from this flow persists into the shared Safari cookie jar.
+        session.prefersEphemeralWebBrowserSession = true
+        webAuthSession = session
+        session.start()
+    }
+
+    /// Redeem the single-use code for the bearer token (POST body — never a URL).
+    private func exchangeCodeForToken(code: String, verifier: String) {
+        var req = URLRequest(url: Self.authBase.appendingPathComponent("mobile/oauth/exchange"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["code": code, "code_verifier": verifier])
+
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, error in
+            guard let self else { return }
+            guard let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let token = json["token"] as? String, !token.isEmpty
+            else {
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.errorMessage = error?.localizedDescription ?? "Sign-in could not be completed. Please try again."
+                }
+                return
+            }
+            self.fetchSessionUser(bearerToken: token)
+        }.resume()
+    }
+
+    /// Fetch the profile with the bearer token and establish the session.
+    private func fetchSessionUser(bearerToken: String) {
+        var req = URLRequest(url: Self.authBase.appendingPathComponent("api/auth/get-session"))
+        req.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, error in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                self.isLoading = false
+                guard let data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let userDict = json["user"] as? [String: Any],
+                      let id = userDict["id"] as? String
+                else {
+                    self.errorMessage = error?.localizedDescription ?? "Could not load your profile. Please try again."
+                    return
+                }
+                let user = GoogleUser(
+                    id: id,
+                    email: (userDict["email"] as? String) ?? "",
+                    displayName: (userDict["name"] as? String) ?? (userDict["email"] as? String) ?? "",
+                    photoURL: (userDict["image"] as? String).flatMap { URL(string: $0) }
+                )
+                AuthTokenStore.save(bearerToken)
+                self.errorMessage = nil
+                self.currentUser = user
+                self.isSignedIn = true
+                self.persist(user)
+            }
+        }.resume()
     }
 
     // MARK: - Sign In with Apple
@@ -142,6 +367,14 @@ public class GoogleAuthService: ObservableObject {
         #if canImport(GoogleSignIn)
         GIDSignIn.sharedInstance.signOut()
         #endif
+        // Revoke the server session too (fire-and-forget) when one exists.
+        if let token = AuthTokenStore.read() {
+            var req = URLRequest(url: Self.authBase.appendingPathComponent("api/auth/sign-out"))
+            req.httpMethod = "POST"
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            URLSession.shared.dataTask(with: req).resume()
+            AuthTokenStore.delete()
+        }
         currentUser = nil
         isSignedIn = false
         UserDefaults.standard.removeObject(forKey: persistenceKey)
@@ -201,6 +434,16 @@ public class GoogleAuthService: ObservableObject {
         if let data = try? JSONEncoder().encode(user) {
             UserDefaults.standard.set(data, forKey: persistenceKey)
         }
+    }
+}
+
+// MARK: - Presentation anchor for ASWebAuthenticationSession
+extension GoogleAuthService: ASWebAuthenticationPresentationContextProviding {
+    public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
     }
 }
 

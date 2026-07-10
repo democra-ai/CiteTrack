@@ -165,7 +165,9 @@ struct SignInButtons: View {
             .frame(height: 50)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            if GoogleAuthService.hasGIDClientID, let onGoogle {
+            // Native SDK configured OR our auth service has Google live — the
+            // second flips on server-side without an app update.
+            if GoogleAuthService.hasGIDClientID || auth.serverGoogleAvailable, let onGoogle {
                 GoogleSignInButton(action: onGoogle)
             }
         }
