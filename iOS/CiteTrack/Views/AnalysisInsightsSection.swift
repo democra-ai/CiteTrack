@@ -14,6 +14,11 @@ struct AnalysisInsightsSection: View {
     /// When true (per-paper screens), runs the analysis automatically on first appear
     /// if no cached result exists — so opening a paper "just analyzes it".
     var autoRun: Bool = false
+    #if DEBUG
+    /// Promo/screenshot harness: pre-seed a result so the populated UI renders
+    /// without a network round-trip. Never set in production.
+    var injectedAnalysis: AnalysisResult? = nil
+    #endif
 
     /// Backend storage key: scoped to the publication when per-paper, else scholar-wide.
     private var analysisScholarId: String {
@@ -93,6 +98,12 @@ struct AnalysisInsightsSection: View {
             }
         }
         .task(id: analysisScholarId) {
+            #if DEBUG
+            if let injectedAnalysis {
+                await MainActor.run { analysis = injectedAnalysis }
+                return
+            }
+            #endif
             await loadCachedIfAvailable()
             // Per-paper screens analyze on open when there's nothing cached yet,
             // so tapping a paper "just runs" its analysis (one paper at a time).

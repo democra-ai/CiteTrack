@@ -4825,6 +4825,68 @@ enum PromoHarness {
         return s
     }
 
+    /// A rich, hand-crafted analysis result so the Insights screen renders fully
+    /// populated (notable citers, top venues, research directions) for the promo,
+    /// with no network round-trip. Famous ML names make the "who cited you" beat land.
+    static var demoAnalysis: AnalysisResult? {
+        let zh = lang == "zh"
+        func dir(_ i: Int, _ en: String, _ cn: String, _ sEn: String, _ sCn: String, _ kw: [String], _ n: Int) -> String {
+            let label = zh ? cn : en, summary = zh ? sCn : sEn
+            let kws = kw.map { "\"\($0)\"" }.joined(separator: ",")
+            return """
+            {"clusterIndex":\(i),"label":"\(label)","summary":"\(summary)","keywords":[\(kws)],"paperCount":\(n),"examplePapers":[]}
+            """
+        }
+        func citer(_ id: String, _ name: String, _ aff: String, _ h: Int, _ cited: Int, _ n: Int) -> String {
+            """
+            {"id":"\(id)","name":"\(name)","openalexId":"\(id)","affiliation":"\(aff)","hIndex":\(h),"citedByCount":\(cited),"worksCount":\(n * 40),"paperCount":\(n),"examplePapers":[]}
+            """
+        }
+        func venue(_ name: String, _ type: String, _ pc: Int, _ tc: Int) -> String {
+            "{\"name\":\"\(name)\",\"type\":\"\(type)\",\"paperCount\":\(pc),\"totalCitations\":\(tc),\"papers\":[]}"
+        }
+        func inst(_ id: String, _ name: String, _ country: String, _ pc: Int, _ ac: Int) -> String {
+            "{\"id\":\"\(id)\",\"name\":\"\(name)\",\"country\":\"\(country)\",\"type\":\"education\",\"paperCount\":\(pc),\"uniqueAuthorCount\":\(ac),\"authors\":[]}"
+        }
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let json = """
+        {
+          "scholarId": "\(scholarId)",
+          "generatedAt": \(now),
+          "citingPapersCount": 4218,
+          "enrichedPapersCount": 4218,
+          "notableCiters": [
+            \(citer("h1", "Geoffrey Hinton", zh ? "多伦多大学" : "University of Toronto", 172, 912_340, 21)),
+            \(citer("h2", "Yann LeCun", zh ? "纽约大学 · Meta AI" : "New York University · Meta AI", 149, 388_210, 17)),
+            \(citer("h3", "Ilya Sutskever", "OpenAI", 96, 421_770, 14)),
+            \(citer("h4", "Fei-Fei Li", zh ? "斯坦福大学" : "Stanford University", 138, 301_560, 11)),
+            \(citer("h5", "Christopher Manning", zh ? "斯坦福大学" : "Stanford University", 154, 288_900, 9))
+          ],
+          "topVenues": [
+            \(venue("NeurIPS", "conference", 612, 148_900)),
+            \(venue("ICML", "conference", 507, 121_400)),
+            \(venue("Nature", "journal", 63, 88_200)),
+            \(venue("ICLR", "conference", 441, 96_700))
+          ],
+          "researchDirections": [
+            \(dir(0, "Deep Learning", "深度学习", "Foundational architectures and optimization behind modern neural networks.", "现代神经网络背后的基础架构与优化方法。", ["neural networks","backpropagation","optimization"], 1840)),
+            \(dir(1, "Attention & Transformers", "注意力与 Transformer", "Sequence models and attention mechanisms powering today's large models.", "驱动当今大模型的序列建模与注意力机制。", ["attention","transformers","language models"], 1210)),
+            \(dir(2, "Representation Learning", "表示学习", "Self-supervised and generative approaches to learning useful representations.", "以自监督与生成式方法学习有用的表示。", ["self-supervised","embeddings","generative models"], 760))
+          ],
+          "topCitedPapers": [
+            {"id":"p1","title":"Attention Is All You Need","authors":["Vaswani, A.","Shazeer, N."],"year":2017,"venue":"NeurIPS","citationCount":132000,"scholarUrl":null},
+            {"id":"p2","title":"Deep Residual Learning for Image Recognition","authors":["He, K.","Zhang, X."],"year":2016,"venue":"CVPR","citationCount":210000,"scholarUrl":null}
+          ],
+          "citingInstitutions": [
+            \(inst("i1", zh ? "谷歌 DeepMind" : "Google DeepMind", zh ? "英国" : "United Kingdom", 318, 214)),
+            \(inst("i2", zh ? "斯坦福大学" : "Stanford University", zh ? "美国" : "United States", 276, 198)),
+            \(inst("i3", "MIT", zh ? "美国" : "United States", 241, 175))
+          ]
+        }
+        """
+        return try? JSONDecoder().decode(AnalysisResult.self, from: Data(json.utf8))
+    }
+
     static func bootstrap() {
         // 1) Language
         LocalizationManager.shared.currentLanguage = (lang == "zh") ? .chinese : .english
@@ -4914,14 +4976,15 @@ struct PromoRouter: View {
                 .navigationViewStyle(.stack)
             case "insights":
                 CitationInsightsView()
-            case "insights_result":
+            case "insights_result", "citers":
                 NavigationView {
                     ScrollView {
                         AnalysisInsightsSection(
                             scholar: PromoHarness.demoScholar,
                             publications: [],
                             citingPapers: [],
-                            autoRun: true
+                            autoRun: false,
+                            injectedAnalysis: PromoHarness.demoAnalysis
                         )
                         .padding()
                     }
@@ -4930,6 +4993,8 @@ struct PromoRouter: View {
                     .navigationBarTitleDisplayMode(.inline)
                 }
                 .navigationViewStyle(.stack)
+            case "widget":
+                PromoWidgetShowcase()
             case "score":
                 NavigationView {
                     HaiyouScoreView(scholarId: PromoHarness.scholarId, scholarName: "Yoshua Bengio")
@@ -4943,6 +5008,116 @@ struct PromoRouter: View {
         }
         .environmentObject(DataManager.shared)
         .environmentObject(lm)
+    }
+}
+
+// Home-screen widget showcase for the promo: renders CiteTrack's Home Screen
+// widget (small + medium) on a wallpaper backdrop, highlighting the in-widget
+// switch + refresh controls. Faithful to CiteTrackWidgetExtension's design
+// (that view lives in a separate target and can't be imported here).
+struct PromoWidgetShowcase: View {
+    @ObservedObject private var lm = LocalizationManager.shared
+    private var zh: Bool { lm.currentLanguage == .chinese }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(red: 0.16, green: 0.22, blue: 0.42),
+                                    Color(red: 0.30, green: 0.20, blue: 0.45),
+                                    Color(red: 0.12, green: 0.14, blue: 0.30)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+                .ignoresSafeArea()
+
+            VStack(spacing: 28) {
+                Text(zh ? "桌面小组件" : "Home Screen Widget")
+                    .font(.system(size: 30, weight: .bold)).foregroundColor(.white)
+                Text(zh ? "引用量随时可见 · 一键刷新 / 切换学者" : "Your citations at a glance · refresh or switch scholars in a tap")
+                    .font(.subheadline).foregroundColor(.white.opacity(0.75))
+                    .multilineTextAlignment(.center).padding(.horizontal, 40)
+
+                smallWidget
+                    .frame(width: 170, height: 170)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .shadow(color: .black.opacity(0.35), radius: 22, y: 12)
+
+                mediumWidget
+                    .frame(width: 360, height: 170)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .shadow(color: .black.opacity(0.35), radius: 22, y: 12)
+            }
+            .padding(.vertical, 40)
+        }
+        .environment(\.colorScheme, .dark)
+    }
+
+    // small widget: name + big citation number + switch/refresh controls
+    private var smallWidget: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Yoshua Bengio").font(.headline).fontWeight(.bold).lineLimit(1).minimumScaleFactor(0.7)
+                Spacer()
+                Circle().fill(Color.green).frame(width: 6, height: 6)
+            }
+            Text(zh ? "蒙特利尔大学 · Mila" : "Univ. Montréal · Mila")
+                .font(.caption2).foregroundColor(.secondary).lineLimit(1)
+            Spacer()
+            VStack(spacing: 2) {
+                Text("963,124").font(.system(size: 40, weight: .heavy)).minimumScaleFactor(0.5).lineLimit(1)
+                Text(zh ? "总引用" : "citations").font(.caption).foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            Spacer()
+            HStack {
+                widgetButton("arrow.left.arrow.right")
+                Spacer()
+                Label("+523", systemImage: "arrow.up.right")
+                    .font(.caption2).fontWeight(.semibold).foregroundColor(.green)
+                Spacer()
+                widgetButton("arrow.clockwise")
+            }
+        }
+        .padding(12)
+    }
+
+    // medium widget: two scholars side by side (the "switch" story)
+    private var mediumWidget: some View {
+        HStack(spacing: 0) {
+            widgetScholarColumn("Yoshua Bengio", "963,124", "+523", updated: true)
+            Divider().frame(height: 96)
+            widgetScholarColumn("Geoffrey Hinton", "912,340", "+488", updated: false)
+        }
+        .padding(14)
+        .overlay(alignment: .topTrailing) {
+            HStack(spacing: 8) {
+                widgetButton("arrow.left.arrow.right")
+                widgetButton("arrow.clockwise")
+            }
+            .padding(10)
+        }
+    }
+
+    private func widgetScholarColumn(_ name: String, _ cites: String, _ growth: String, updated: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(name).font(.subheadline).fontWeight(.semibold).lineLimit(1).minimumScaleFactor(0.7)
+                Circle().fill(updated ? Color.green : Color.gray.opacity(0.5)).frame(width: 6, height: 6)
+            }
+            Spacer()
+            Text(cites).font(.system(size: 30, weight: .heavy)).minimumScaleFactor(0.5).lineLimit(1)
+            Text(zh ? "总引用" : "citations").font(.caption2).foregroundColor(.secondary)
+            Label(growth, systemImage: "arrow.up.right")
+                .font(.caption2).fontWeight(.semibold).foregroundColor(.green)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+    }
+
+    private func widgetButton(_ symbol: String) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16).fill(Color.blue.opacity(0.18)).frame(width: 32, height: 32)
+            Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundColor(.blue)
+        }
     }
 }
 #endif

@@ -9,14 +9,16 @@ import {
   ScenePoster,
   SceneHook,
   SceneDashboard,
-  SceneInsights,
+  SceneWidget,
+  SceneAnalysis,
   SceneDevices,
   SceneLogo,
 } from "./scenes";
 
 export const PROMO_FPS = 30;
-const D = [60, 90, 120, 130, 160, 160];
-export const PROMO_DURATION = D.reduce((a, b) => a + b, 0) - 5 * 15; // 645f = 21.5s
+//          Poster Hook Dash Widget Analysis Devices Logo
+const D = [60, 90, 120, 120, 150, 160, 160];
+export const PROMO_DURATION = D.reduce((a, b) => a + b, 0) - 6 * 15; // 770f ≈ 25.7s
 
 const T = (
   presentation: Parameters<typeof TransitionSeries.Transition>[0]["presentation"],
@@ -43,14 +45,18 @@ export const Promo: React.FC<PromoProps> = ({ lang, platform, withAudio = true }
           </TransitionSeries.Sequence>
           {T(slide({ direction: "from-right" }))}
           <TransitionSeries.Sequence durationInFrames={D[3]}>
-            <SceneInsights />
+            <SceneWidget />
           </TransitionSeries.Sequence>
-          {T(fade())}
+          {T(slide({ direction: "from-right" }))}
           <TransitionSeries.Sequence durationInFrames={D[4]}>
-            <SceneDevices />
+            <SceneAnalysis />
           </TransitionSeries.Sequence>
           {T(fade())}
           <TransitionSeries.Sequence durationInFrames={D[5]}>
+            <SceneDevices />
+          </TransitionSeries.Sequence>
+          {T(fade())}
+          <TransitionSeries.Sequence durationInFrames={D[6]}>
             <SceneLogo />
           </TransitionSeries.Sequence>
         </TransitionSeries>

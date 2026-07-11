@@ -157,6 +157,16 @@ export const SceneInsights: React.FC = () => {
   const { t } = usePromo();
   return <Feature headline={t.insights.headline} sub={t.insights.sub} screen="insights" device="ipad" />;
 };
+/* Analysis result — research directions, top venues, and the notable citers */
+export const SceneAnalysis: React.FC = () => {
+  const { t } = usePromo();
+  return <Feature headline={t.analysis.headline} sub={t.analysis.sub} screen="analysis" device="ipad" />;
+};
+/* Home Screen widget — refresh / switch */
+export const SceneWidget: React.FC = () => {
+  const { t } = usePromo();
+  return <Feature headline={t.widget.headline} sub={t.widget.sub} screen="widget" device="ios" />;
+};
 
 /* S4 — hero: iPhone + iPad + Mac */
 export const SceneDevices: React.FC = () => {
