@@ -123,3 +123,4 @@ test_output/
 logs/
 marketing/promo/out/
 marketing/promo/node_modules/
+iOS/build_sim/

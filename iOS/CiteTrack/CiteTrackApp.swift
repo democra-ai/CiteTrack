@@ -5151,44 +5151,32 @@ struct PromoWidgetShowcase: View {
 
     var body: some View {
         ZStack {
-            // Neutral wallpaper so both the white and black widgets read clearly.
-            LinearGradient(colors: [Color(red: 0.38, green: 0.44, blue: 0.62),
-                                    Color(red: 0.30, green: 0.30, blue: 0.50),
-                                    Color(red: 0.20, green: 0.22, blue: 0.40)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            // Same bright, airy canvas as every other scene — the widgets are just
+            // dropped onto it (the scene headline provides the "Home Screen" message).
+            LinearGradient(colors: [Color(red: 0.972, green: 0.968, blue: 0.953),
+                                    Color(red: 0.925, green: 0.918, blue: 0.890)],
+                           startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
 
-            VStack(spacing: 34) {
-                VStack(spacing: 10) {
-                    Text(zh ? "桌面小组件" : "Home Screen Widget")
-                        .font(.system(size: 30, weight: .bold)).foregroundColor(.white)
-                    Text(zh ? "引用量一眼看见 · 一键刷新 / 切换学者" : "Citations at a glance · refresh or switch in a tap")
-                        .font(.subheadline).foregroundColor(.white.opacity(0.8))
-                        .multilineTextAlignment(.center).padding(.horizontal, 36)
-                }
-
-                HStack(alignment: .top, spacing: 30) {
-                    widgetTile(dark: false, label: zh ? "浅色" : "Light")
-                    widgetTile(dark: true, label: zh ? "深色" : "Dark")
-                }
+            HStack(alignment: .top, spacing: 34) {
+                widgetTile(dark: false, label: zh ? "浅色" : "Light")
+                widgetTile(dark: true, label: zh ? "深色" : "Dark")
             }
-            .padding(.vertical, 44)
         }
-        .environment(\.colorScheme, .dark)
     }
 
-    // A framed home-screen widget + a caption ("Light" / "Dark").
+    // A framed home-screen widget + a small caption ("Light" / "Dark").
     private func widgetTile(dark: Bool, label: String) -> some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             realSmallWidget(dark: dark)
                 .frame(width: 158, height: 158)
                 .background(dark ? Color.black : Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(Color.white.opacity(dark ? 0.10 : 0.0), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.32), radius: 20, y: 12)
+                    .strokeBorder(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.18), radius: 24, y: 14)
                 .environment(\.colorScheme, dark ? .dark : .light)
-            Text(label).font(.footnote.weight(.semibold)).foregroundColor(.white.opacity(0.85))
+            Text(label).font(.footnote.weight(.semibold)).foregroundColor(Color(red: 0.35, green: 0.38, blue: 0.41))
         }
     }
 
@@ -5199,7 +5187,9 @@ struct PromoWidgetShowcase: View {
                 // Top: name + status dot, then institution — fixed 44pt block.
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("Yoshua Bengio")
+                        // Real widget abbreviates long names via `adaptiveAbbreviated`
+                        // ("Yoshua Bengio" > 12 chars → "Y. Bengio").
+                        Text("Y. Bengio")
                             .font(.headline).fontWeight(.bold).foregroundColor(.primary)
                             .lineLimit(1).minimumScaleFactor(0.7)
                         Spacer()
