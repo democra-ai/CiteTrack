@@ -634,11 +634,11 @@
 				CODE_SIGN_ENTITLEMENTS = CiteTrackWidgetExtension/CiteTrackWidgetExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				INFOPLIST_FILE = CiteTrackWidgetExtension/WidgetInfo.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.citetrack.CiteTrack.widget;
 				PRODUCT_NAME = CiteTrackWidgetExtension;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -659,11 +659,11 @@
 				CODE_SIGN_ENTITLEMENTS = CiteTrackWidgetExtension/CiteTrackWidgetExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				INFOPLIST_FILE = CiteTrackWidgetExtension/WidgetInfo.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.citetrack.CiteTrack.widget;
 				PRODUCT_NAME = CiteTrackWidgetExtension;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -809,7 +809,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_ASSET_PATHS = "\"CiteTrack/Preview Content\"";
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				ENABLE_PREVIEWS = YES;
@@ -832,7 +832,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.citetrack.CiteTrack;
 				PRODUCT_NAME = CiteTrack;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -857,7 +857,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_ASSET_PATHS = "\"CiteTrack/Preview Content\"";
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				ENABLE_PREVIEWS = YES;
@@ -880,7 +880,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.citetrack.CiteTrack;
 				PRODUCT_NAME = CiteTrack;
 				PROVISIONING_PROFILE_SPECIFIER = "";

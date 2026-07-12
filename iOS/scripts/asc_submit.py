@@ -97,12 +97,12 @@ def get_or_create_version(ver):
 
 
 WHATS_NEW = {
-    "en-US": ("• New: Sign in with Google, alongside Sign in with Apple\n"
-              "• Sign in to unlock AI-powered citation insights\n"
-              "• Your session is now stored securely in the Keychain"),
-    "zh-Hans": ("• 新增：支持使用 Google 账户登录（与 Apple 登录并存）\n"
-                "• 登录后即可解锁 AI 引用洞察\n"
-                "• 登录凭证改为安全存储于钥匙串（Keychain）"),
+    "en-US": ("• New: Send feedback right from the app — Settings › Feedback\n"
+              "• Google and Apple sign-in unlock AI-powered citation insights\n"
+              "• Reliability and performance improvements"),
+    "zh-Hans": ("• 新增：在应用内直接反馈——「设置 › 反馈」\n"
+                "• 使用 Google 或 Apple 登录即可解锁 AI 引用洞察\n"
+                "• 稳定性与性能优化"),
 }
 
 
