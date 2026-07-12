@@ -2058,6 +2058,16 @@ struct SettingsView: View {
                 }
                 #endif
 
+                Section(localizationManager.localized("feedback_section")) {
+                    NavigationLink(destination: FeedbackView()) {
+                        HStack {
+                            Image(systemName: "bubble.left.and.bubble.right.fill")
+                                .foregroundColor(.blue)
+                            Text(localizationManager.localized("feedback_send"))
+                        }
+                    }
+                }
+
                 Section(localizationManager.localized("about")) {
                     Text(localizationManager.localized("app_description"))
                         .font(.headline)
@@ -4796,6 +4806,124 @@ private struct HeatmapBlockSelectionEffect: ViewModifier {
             .scaleEffect(isSelected ? 1.15 : 1.0)
             .offset(y: isSelected ? -2 : 0)
             .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0), value: isSelected)
+    }
+}
+
+// MARK: - Feedback
+/// In-app feedback form. Posts to the CiteTrack feedback endpoint, which emails
+/// the team (same channel as the website). No account required.
+struct FeedbackView: View {
+    @ObservedObject private var lm = LocalizationManager.shared
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var category = "idea"     // idea | bug | other
+    @State private var message = ""
+    @State private var email = ""
+    @State private var isSending = false
+    @State private var sent = false
+    @State private var errorText: String?
+
+    private static let endpoint = URL(string: "https://citetrack.democra.ai/api/feedback")!
+
+    var body: some View {
+        Form {
+            if sent {
+                Section {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 44)).foregroundColor(.green)
+                        Text(lm.localized("feedback_thanks"))
+                            .font(.headline).multilineTextAlignment(.center)
+                        Button(lm.localized("done")) { dismiss() }
+                            .padding(.top, 4)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 10)
+                }
+            } else {
+                Section(lm.localized("feedback_category")) {
+                    Picker(lm.localized("feedback_category"), selection: $category) {
+                        Text(lm.localized("feedback_idea")).tag("idea")
+                        Text(lm.localized("feedback_bug")).tag("bug")
+                        Text(lm.localized("feedback_other")).tag("other")
+                    }
+                    .pickerStyle(.segmented)
+                }
+                Section(lm.localized("feedback_message")) {
+                    TextEditor(text: $message)
+                        .frame(minHeight: 120)
+                        .overlay(alignment: .topLeading) {
+                            if message.isEmpty {
+                                Text(lm.localized("feedback_placeholder"))
+                                    .foregroundColor(.secondary).padding(.top, 8).padding(.leading, 5)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                }
+                Section {
+                    TextField(lm.localized("feedback_email_optional"), text: $email)
+                        .keyboardType(.emailAddress).textContentType(.emailAddress)
+                        .autocapitalization(.none).disableAutocorrection(true)
+                } footer: {
+                    Text(lm.localized("feedback_email_hint"))
+                }
+                if let errorText {
+                    Section { Label(errorText, systemImage: "exclamationmark.triangle").foregroundColor(.orange) }
+                }
+                Section {
+                    Button(action: submit) {
+                        HStack {
+                            if isSending { ProgressView().padding(.trailing, 4) }
+                            Text(lm.localized("feedback_send"))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .disabled(isSending || message.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                }
+            }
+        }
+        .navigationTitle(lm.localized("feedback_send"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func submit() {
+        let msg = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard msg.count >= 2 else { return }
+        isSending = true; errorText = nil
+
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        #if targetEnvironment(macCatalyst)
+        let plat = "macCatalyst \(UIDevice.current.systemVersion)"
+        let src = "macos"
+        #else
+        let plat = "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion) · \(UIDevice.current.model)"
+        let src = "ios"
+        #endif
+        let payload: [String: String] = [
+            "message": msg,
+            "email": email.trimmingCharacters(in: .whitespacesAndNewlines),
+            "category": category,
+            "from": src,
+            "appVersion": "\(version) (\(build))",
+            "platform": plat,
+        ]
+
+        var req = URLRequest(url: Self.endpoint)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            DispatchQueue.main.async {
+                isSending = false
+                if let code = (resp as? HTTPURLResponse)?.statusCode, code == 200 {
+                    sent = true
+                } else {
+                    let serverMsg = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String
+                    errorText = serverMsg ?? err?.localizedDescription ?? lm.localized("feedback_error")
+                }
+            }
+        }.resume()
     }
 }
 

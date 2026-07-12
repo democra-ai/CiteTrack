@@ -19,8 +19,107 @@ struct SettingsView: View {
                 .tabItem {
                     Label(L("sidebar_data"), systemImage: "externaldrive")
                 }
+
+            FeedbackSettingsTab()
+                .tabItem {
+                    Label(L("feedback_section"), systemImage: "bubble.left.and.bubble.right")
+                }
         }
         .frame(minWidth: 560, minHeight: 460)
+    }
+}
+
+// MARK: - Feedback Tab
+/// In-app feedback. Posts to the CiteTrack feedback endpoint (emails the team —
+/// same channel as the website + iOS). No account required.
+struct FeedbackSettingsTab: View {
+    @State private var category = "idea"
+    @State private var message = ""
+    @State private var email = ""
+    @State private var isSending = false
+    @State private var sent = false
+    @State private var errorText: String?
+
+    private static let endpoint = URL(string: "https://citetrack.democra.ai/api/feedback")!
+
+    var body: some View {
+        Form {
+            if sent {
+                Section {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 40)).foregroundColor(.green)
+                        Text(L("feedback_thanks")).font(.headline)
+                        Button(L("done")) { sent = false; message = ""; email = "" }
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 12)
+                }
+            } else {
+                Section {
+                    Picker(L("feedback_category"), selection: $category) {
+                        Text(L("feedback_idea")).tag("idea")
+                        Text(L("feedback_bug")).tag("bug")
+                        Text(L("feedback_other")).tag("other")
+                    }
+                    .pickerStyle(.segmented)
+                }
+                Section {
+                    Text(L("feedback_message")).font(.subheadline).foregroundColor(.secondary)
+                    TextEditor(text: $message).frame(minHeight: 120).font(.body)
+                }
+                Section {
+                    TextField(L("feedback_email_optional"), text: $email)
+                    Text(L("feedback_email_hint")).font(.caption).foregroundColor(.secondary)
+                }
+                if let errorText {
+                    Section { Label(errorText, systemImage: "exclamationmark.triangle").foregroundColor(.orange) }
+                }
+                Section {
+                    HStack {
+                        Spacer()
+                        Button(action: submit) {
+                            HStack {
+                                if isSending { ProgressView().controlSize(.small).padding(.trailing, 4) }
+                                Text(L("feedback_send"))
+                            }
+                        }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(isSending || message.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                    }
+                }
+            }
+        }
+        .padding(20)
+    }
+
+    private func submit() {
+        let msg = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard msg.count >= 2 else { return }
+        isSending = true; errorText = nil
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        let payload: [String: String] = [
+            "message": msg,
+            "email": email.trimmingCharacters(in: .whitespacesAndNewlines),
+            "category": category,
+            "from": "macos",
+            "appVersion": "\(version) (\(build))",
+            "platform": "macOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
+        ]
+        var req = URLRequest(url: Self.endpoint)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            DispatchQueue.main.async {
+                isSending = false
+                if (resp as? HTTPURLResponse)?.statusCode == 200 {
+                    sent = true
+                } else {
+                    let serverMsg = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String
+                    errorText = serverMsg ?? err?.localizedDescription ?? L("feedback_error")
+                }
+            }
+        }.resume()
     }
 }
 
