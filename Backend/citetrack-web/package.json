@@ -1,0 +1,17 @@
+{
+  "name": "citetrack-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {
+    "hono": "^4.6.14",
+    "mimetext": "^3.0.28"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0",
+    "@cloudflare/workers-types": "^4.20241127.0"
+  }
+}

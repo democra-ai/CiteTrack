@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "citetrack-web",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "41ebb4f61f901310c3acf958bbf08e4d",
+
+  "observability": { "enabled": true },
+
+  // Landing page (static) is served by the assets layer; the Worker runs only for
+  // requests with no matching asset — i.e. POST /api/feedback.
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+
+  // Cloudflare Email Routing outbound. Delivers only to VERIFIED destination
+  // addresses on the account (FEEDBACK_TO must be verified in Email Routing).
+  "send_email": [{ "name": "EMAIL" }],
+
+  "vars": {
+    "EMAIL_FROM": "noreply@democra.ai",
+    // Must be a VERIFIED Cloudflare Email Routing destination (tauon.sh@gmail.com is).
+    // To use another address, verify it in Email Routing → Destination addresses,
+    // or set a RESEND_API_KEY secret to deliver to any address.
+    "FEEDBACK_TO": "tauon.sh@gmail.com"
+  },
+
+  "routes": [{ "pattern": "citetrack.democra.ai", "custom_domain": true }]
+  // Optional secret: RESEND_API_KEY — set to deliver to ANY address (not just
+  // verified Email Routing destinations). Falls back to Email Routing if unset.
+}

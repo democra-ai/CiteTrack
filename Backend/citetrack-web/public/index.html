@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CiteTrack — Know your impact</title>
+<meta name="description" content="Track every citation, see who cites you, and keep your scholarly impact on your Home Screen. iPhone, iPad, and Mac." />
+<meta property="og:title" content="CiteTrack — Know your impact" />
+<meta property="og:description" content="Track citations, AI-powered insights into who cites you, and a Home Screen widget. iPhone · iPad · Mac." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="/assets/icon.png" />
+<style>
+  :root{
+    --canvas:#F4F2EE; --ink:#1E2329; --sub:#5A6068; --blue:#006EEE; --blue-soft:#4F95F2;
+    --tint:#DCEAFB; --card:#FFFFFF; --line:rgba(30,35,41,.08); --shadow:58,66,78;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Noto Sans SC",sans-serif;
+       color:var(--ink);background:var(--canvas);line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:999px;font-weight:600;font-size:15px;
+       border:none;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+  .btn-primary{background:var(--ink);color:var(--canvas);box-shadow:0 10px 30px rgba(var(--shadow),.18)}
+  .btn-primary:hover{transform:translateY(-1px)}
+  .btn-blue{background:var(--blue);color:#fff}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .chip{display:inline-block;padding:6px 14px;border-radius:999px;background:var(--tint);color:var(--blue);font-weight:600;font-size:13px}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:50;backdrop-filter:saturate(1.5) blur(14px);background:rgba(244,242,238,.72);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.01em}
+  .brand img{width:30px;height:30px;border-radius:8px}
+  .nav-links{display:flex;align-items:center;gap:26px;font-size:15px;color:var(--sub)}
+  .nav-links a:hover{color:var(--ink)}
+
+  /* hero */
+  header{padding:72px 0 40px;text-align:center;position:relative;overflow:hidden}
+  header::before{content:"";position:absolute;inset:-20% 30% auto -20%;height:520px;
+    background:radial-gradient(closest-side,rgba(79,149,242,.16),transparent);filter:blur(10px);pointer-events:none}
+  h1{font-size:clamp(38px,7vw,72px);line-height:1.02;letter-spacing:-.035em;font-weight:800;position:relative}
+  h1 .accent{color:var(--blue)}
+  .lead{margin:22px auto 0;max-width:640px;font-size:clamp(17px,2.4vw,21px);color:var(--sub)}
+  .cta{margin-top:32px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;position:relative}
+  .platforms{margin-top:20px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
+  /* video */
+  .video-wrap{margin:52px auto 0;max-width:940px;border-radius:22px;overflow:hidden;
+    box-shadow:0 40px 90px rgba(var(--shadow),.20),0 8px 24px rgba(var(--shadow),.10);position:relative;background:#111}
+  .video-wrap video{display:block;width:100%;height:auto}
+
+  /* sections */
+  section{padding:76px 0}
+  .eyebrow{color:var(--blue);font-weight:700;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+  h2{font-size:clamp(28px,4vw,42px);letter-spacing:-.03em;font-weight:800;margin-top:10px}
+  .section-sub{color:var(--sub);font-size:18px;margin-top:12px;max-width:620px}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+  .feature{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px;
+    box-shadow:0 8px 24px rgba(var(--shadow),.05)}
+  .feature .ic{width:44px;height:44px;border-radius:12px;background:var(--tint);color:var(--blue);
+    display:grid;place-items:center;font-size:22px;margin-bottom:16px}
+  .feature h3{font-size:19px;letter-spacing:-.01em}
+  .feature p{color:var(--sub);font-size:15px;margin-top:8px}
+
+  /* feedback */
+  .feedback{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:40px;
+    box-shadow:0 20px 50px rgba(var(--shadow),.08);max-width:640px;margin:40px auto 0}
+  .feedback h2{margin:0}
+  .field{margin-top:18px}
+  .field label{display:block;font-weight:600;font-size:14px;margin-bottom:7px}
+  .seg{display:flex;gap:8px;flex-wrap:wrap}
+  .seg button{padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:transparent;
+    font-size:14px;font-weight:600;color:var(--sub);cursor:pointer;transition:all .15s}
+  .seg button.on{background:var(--tint);color:var(--blue);border-color:transparent}
+  input,textarea{width:100%;padding:13px 15px;border:1px solid var(--line);border-radius:12px;font:inherit;
+    background:#fbfbfa;color:var(--ink);resize:vertical}
+  input:focus,textarea:focus{outline:none;border-color:var(--blue-soft);box-shadow:0 0 0 3px rgba(79,149,242,.15)}
+  .fb-status{margin-top:14px;font-size:14px;min-height:20px}
+  .fb-status.ok{color:#12864a}.fb-status.err{color:#c0392b}
+
+  footer{padding:44px 0;border-top:1px solid var(--line);color:var(--sub);font-size:14px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  @media (max-width:760px){
+    .grid{grid-template-columns:1fr}
+    .nav-links a:not(.btn){display:none}
+    section{padding:56px 0}
+    .feedback{padding:26px}
+  }
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="/"><img src="/assets/icon.png" alt="" />CiteTrack</a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#feedback">Feedback</a>
+    <a class="btn btn-blue" href="https://apps.apple.com/app/id6752281652" target="_blank" rel="noopener">App Store</a>
+  </div>
+</div></nav>
+
+<header><div class="wrap">
+  <span class="chip">Now on the App Store</span>
+  <h1>Know your<br><span class="accent">impact.</span></h1>
+  <p class="lead">Track every citation, see the notable scholars who cite you, and keep your numbers on your Home Screen. On iPhone, iPad, and Mac.</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://apps.apple.com/app/id6752281652" target="_blank" rel="noopener"> Download on the App Store</a>
+    <a class="btn btn-ghost" href="#features">See features</a>
+  </div>
+  <div class="platforms">
+    <span class="chip">iPhone</span><span class="chip">iPad</span><span class="chip">Mac</span>
+  </div>
+  <div class="video-wrap">
+    <video src="/assets/promo.mp4" poster="/assets/poster.png" autoplay muted loop playsinline controls></video>
+  </div>
+</div></header>
+
+<section id="features"><div class="wrap">
+  <span class="eyebrow">Everything in one place</span>
+  <h2>Your citations, made clear.</h2>
+  <p class="section-sub">CiteTrack watches your scholarly impact so you don't have to refresh Google Scholar all day.</p>
+  <div class="grid">
+    <div class="feature"><div class="ic">📈</div><h3>Track every citation</h3><p>Your work and the scholars you follow — citation counts, history, and growth, updated for you.</p></div>
+    <div class="feature"><div class="ic">🧠</div><h3>AI citation insights</h3><p>Every citing paper, analyzed: research directions, top venues, and the notable scholars who cite you.</p></div>
+    <div class="feature"><div class="ic">📱</div><h3>Home Screen widget</h3><p>Your citation count at a glance — refresh or switch between scholars in a single tap.</p></div>
+    <div class="feature"><div class="ic">📊</div><h3>Charts over time</h3><p>Watch your citations grow with clear history charts across weeks, months, and quarters.</p></div>
+    <div class="feature"><div class="ic">🔒</div><h3>Sign in, secured</h3><p>Sign in with Apple or Google. Your session is stored securely in the Keychain.</p></div>
+    <div class="feature"><div class="ic">☁️</div><h3>Across your devices</h3><p>iCloud keeps iPhone, iPad, and Mac in sync — your data, everywhere you work.</p></div>
+  </div>
+</div></section>
+
+<section id="feedback" style="padding-top:20px"><div class="wrap" style="text-align:center">
+  <span class="eyebrow">We're listening</span>
+  <h2>Send feedback</h2>
+  <p class="section-sub" style="margin:12px auto 0">Found a bug or have an idea? Tell us — it goes straight to the team.</p>
+  <form class="feedback" id="fbForm" style="text-align:left">
+    <div class="field">
+      <label>What's this about?</label>
+      <div class="seg" id="catSeg">
+        <button type="button" data-cat="idea" class="on">💡 Idea</button>
+        <button type="button" data-cat="bug">🐞 Bug</button>
+        <button type="button" data-cat="other">💬 Other</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="fbMsg">Your message</label>
+      <textarea id="fbMsg" rows="5" placeholder="What would you like us to know?" required></textarea>
+    </div>
+    <div class="field">
+      <label for="fbEmail">Your email <span style="color:var(--sub);font-weight:400">(optional — so we can reply)</span></label>
+      <input id="fbEmail" type="email" placeholder="you@university.edu" />
+    </div>
+    <div style="margin-top:22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <button class="btn btn-blue" id="fbSubmit" type="submit">Send feedback</button>
+      <span class="fb-status" id="fbStatus"></span>
+    </div>
+  </form>
+</div></section>
+
+<footer><div class="wrap">
+  <div>© <span id="yr"></span> CiteTrack · democra.ai</div>
+  <div style="display:flex;gap:20px">
+    <a href="https://apps.apple.com/app/id6752281652" target="_blank" rel="noopener">App Store</a>
+    <a href="#feedback">Feedback</a>
+  </div>
+</div></footer>
+
+<script>
+  document.getElementById("yr").textContent = new Date().getFullYear();
+  let category = "idea";
+  document.querySelectorAll("#catSeg button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#catSeg button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); category = b.dataset.cat;
+  }));
+  const form = document.getElementById("fbForm");
+  const statusEl = document.getElementById("fbStatus");
+  const submit = document.getElementById("fbSubmit");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const message = document.getElementById("fbMsg").value.trim();
+    const email = document.getElementById("fbEmail").value.trim();
+    if (message.length < 2) { statusEl.className = "fb-status err"; statusEl.textContent = "Please write a message."; return; }
+    submit.disabled = true; statusEl.className = "fb-status"; statusEl.textContent = "Sending…";
+    try {
+      const r = await fetch("/api/feedback", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, email, category, from: "website", platform: navigator.userAgent.slice(0,80) })
+      });
+      if (r.ok) { form.reset(); document.querySelectorAll("#catSeg button").forEach((x,i)=>x.classList.toggle("on",i===0)); category="idea";
+        statusEl.className = "fb-status ok"; statusEl.textContent = "Thanks! Your feedback was sent. 🎉"; }
+      else { const d = await r.json().catch(()=>({})); statusEl.className="fb-status err"; statusEl.textContent = "Couldn't send: " + (d.error || r.status); }
+    } catch { statusEl.className = "fb-status err"; statusEl.textContent = "Network error — please try again."; }
+    finally { submit.disabled = false; }
+  });
+</script>
+</body>
+</html>
