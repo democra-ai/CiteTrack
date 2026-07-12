@@ -5139,112 +5139,117 @@ struct PromoRouter: View {
     }
 }
 
-// Home-screen widget showcase for the promo: renders CiteTrack's Home Screen
-// widget (small + medium) on a wallpaper backdrop, highlighting the in-widget
-// switch + refresh controls. Faithful to CiteTrackWidgetExtension's design
-// (that view lives in a separate target and can't be imported here).
+// Home-screen widget showcase for the promo. Pixel-faithful reproduction of
+// CiteTrackWidgetExtension's real `SmallWidgetView` (name + green status dot,
+// 42pt citation number, blue SWITCH + trend + green REFRESH controls), shown in
+// BOTH light and dark. The real widget view lives in a separate target and uses
+// WidgetKit-only APIs (Button(intent:), containerBackground), so it can't be
+// imported here — this mirrors its exact layout, fonts, colours, and controls.
 struct PromoWidgetShowcase: View {
     @ObservedObject private var lm = LocalizationManager.shared
     private var zh: Bool { lm.currentLanguage == .chinese }
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.16, green: 0.22, blue: 0.42),
-                                    Color(red: 0.30, green: 0.20, blue: 0.45),
-                                    Color(red: 0.12, green: 0.14, blue: 0.30)],
+            // Neutral wallpaper so both the white and black widgets read clearly.
+            LinearGradient(colors: [Color(red: 0.38, green: 0.44, blue: 0.62),
+                                    Color(red: 0.30, green: 0.30, blue: 0.50),
+                                    Color(red: 0.20, green: 0.22, blue: 0.40)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
                 .ignoresSafeArea()
 
-            VStack(spacing: 28) {
-                Text(zh ? "桌面小组件" : "Home Screen Widget")
-                    .font(.system(size: 30, weight: .bold)).foregroundColor(.white)
-                Text(zh ? "引用量随时可见 · 一键刷新 / 切换学者" : "Your citations at a glance · refresh or switch scholars in a tap")
-                    .font(.subheadline).foregroundColor(.white.opacity(0.75))
-                    .multilineTextAlignment(.center).padding(.horizontal, 40)
+            VStack(spacing: 34) {
+                VStack(spacing: 10) {
+                    Text(zh ? "桌面小组件" : "Home Screen Widget")
+                        .font(.system(size: 30, weight: .bold)).foregroundColor(.white)
+                    Text(zh ? "引用量一眼看见 · 一键刷新 / 切换学者" : "Citations at a glance · refresh or switch in a tap")
+                        .font(.subheadline).foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center).padding(.horizontal, 36)
+                }
 
-                smallWidget
-                    .frame(width: 170, height: 170)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .shadow(color: .black.opacity(0.35), radius: 22, y: 12)
-
-                mediumWidget
-                    .frame(width: 360, height: 170)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .shadow(color: .black.opacity(0.35), radius: 22, y: 12)
+                HStack(alignment: .top, spacing: 30) {
+                    widgetTile(dark: false, label: zh ? "浅色" : "Light")
+                    widgetTile(dark: true, label: zh ? "深色" : "Dark")
+                }
             }
-            .padding(.vertical, 40)
+            .padding(.vertical, 44)
         }
         .environment(\.colorScheme, .dark)
     }
 
-    // small widget: name + big citation number + switch/refresh controls
-    private var smallWidget: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Yoshua Bengio").font(.headline).fontWeight(.bold).lineLimit(1).minimumScaleFactor(0.7)
-                Spacer()
-                Circle().fill(Color.green).frame(width: 6, height: 6)
-            }
-            Text(zh ? "蒙特利尔大学 · Mila" : "Univ. Montréal · Mila")
-                .font(.caption2).foregroundColor(.secondary).lineLimit(1)
-            Spacer()
-            VStack(spacing: 2) {
-                Text("963,124").font(.system(size: 40, weight: .heavy)).minimumScaleFactor(0.5).lineLimit(1)
-                Text(zh ? "总引用" : "citations").font(.caption).foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            Spacer()
-            HStack {
-                widgetButton("arrow.left.arrow.right")
-                Spacer()
-                Label("+523", systemImage: "arrow.up.right")
-                    .font(.caption2).fontWeight(.semibold).foregroundColor(.green)
-                Spacer()
-                widgetButton("arrow.clockwise")
-            }
-        }
-        .padding(12)
-    }
-
-    // medium widget: two scholars side by side (the "switch" story)
-    private var mediumWidget: some View {
-        HStack(spacing: 0) {
-            widgetScholarColumn("Yoshua Bengio", "963,124", "+523", updated: true)
-            Divider().frame(height: 96)
-            widgetScholarColumn("Geoffrey Hinton", "912,340", "+488", updated: false)
-        }
-        .padding(14)
-        .overlay(alignment: .topTrailing) {
-            HStack(spacing: 8) {
-                widgetButton("arrow.left.arrow.right")
-                widgetButton("arrow.clockwise")
-            }
-            .padding(10)
+    // A framed home-screen widget + a caption ("Light" / "Dark").
+    private func widgetTile(dark: Bool, label: String) -> some View {
+        VStack(spacing: 14) {
+            realSmallWidget(dark: dark)
+                .frame(width: 158, height: 158)
+                .background(dark ? Color.black : Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.white.opacity(dark ? 0.10 : 0.0), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.32), radius: 20, y: 12)
+                .environment(\.colorScheme, dark ? .dark : .light)
+            Text(label).font(.footnote.weight(.semibold)).foregroundColor(.white.opacity(0.85))
         }
     }
 
-    private func widgetScholarColumn(_ name: String, _ cites: String, _ growth: String, updated: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(name).font(.subheadline).fontWeight(.semibold).lineLimit(1).minimumScaleFactor(0.7)
-                Circle().fill(updated ? Color.green : Color.gray.opacity(0.5)).frame(width: 6, height: 6)
-            }
-            Spacer()
-            Text(cites).font(.system(size: 30, weight: .heavy)).minimumScaleFactor(0.5).lineLimit(1)
-            Text(zh ? "总引用" : "citations").font(.caption2).foregroundColor(.secondary)
-            Label(growth, systemImage: "arrow.up.right")
-                .font(.caption2).fontWeight(.semibold).foregroundColor(.green)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-    }
-
-    private func widgetButton(_ symbol: String) -> some View {
+    // Mirrors CiteTrackWidgetExtension/SmallWidgetView.body exactly.
+    private func realSmallWidget(dark: Bool) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 16).fill(Color.blue.opacity(0.18)).frame(width: 32, height: 32)
-            Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundColor(.blue)
+            VStack(spacing: 0) {
+                // Top: name + status dot, then institution — fixed 44pt block.
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Yoshua Bengio")
+                            .font(.headline).fontWeight(.bold).foregroundColor(.primary)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                        Spacer()
+                        Circle().fill(Color.green).frame(width: 6, height: 6) // updated today
+                    }
+                    HStack {
+                        Text(zh ? "蒙特利尔大学 · Mila" : "Univ. Montréal · Mila")
+                            .font(.caption2).foregroundColor(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                        Spacer()
+                    }
+                }
+                .frame(height: 44).padding(.top, 12).padding(.horizontal, 12)
+
+                Spacer()
+
+                // Center: big citation number + label.
+                VStack(spacing: 6) {
+                    Text("963,124").font(.system(size: 42, weight: .heavy))
+                        .foregroundColor(.primary).minimumScaleFactor(0.5).lineLimit(1)
+                    Text(zh ? "总引用" : "citations").font(.caption).foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+
+                Spacer()
+                Color.clear.frame(height: 35)
+            }
+
+            // Bottom controls: blue SWITCH · trend · green REFRESH.
+            VStack {
+                Spacer()
+                HStack {
+                    controlButton(symbol: "arrow.left.arrow.right", tint: .blue) // switch
+                    Spacer()
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.up.right").font(.caption2)
+                        Text("+523").font(.caption).fontWeight(.semibold)
+                    }
+                    .foregroundColor(.green).lineLimit(1).frame(minWidth: 80)
+                    Spacer()
+                    controlButton(symbol: "arrow.clockwise", tint: .green) // refresh
+                }
+                .padding(.horizontal, 2).padding(.bottom, 2)
+            }
+        }
+    }
+
+    private func controlButton(symbol: String, tint: Color) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16).fill(tint.opacity(0.15)).frame(width: 32, height: 32)
+            Image(systemName: symbol).font(.title3).foregroundColor(tint)
         }
     }
 }
