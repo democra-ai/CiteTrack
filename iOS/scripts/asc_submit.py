@@ -97,11 +97,11 @@ def get_or_create_version(ver):
 
 
 WHATS_NEW = {
-    "en-US": ("• New: Send feedback right from the app — Settings › Feedback\n"
-              "• Google and Apple sign-in unlock AI-powered citation insights\n"
+    "en-US": ("• New: a quick nudge to add the Home Screen widget (shown only if you don't have one yet)\n"
+              "• New: share suggestions about Citation Insights right from that screen\n"
               "• Reliability and performance improvements"),
-    "zh-Hans": ("• 新增：在应用内直接反馈——「设置 › 反馈」\n"
-                "• 使用 Google 或 Apple 登录即可解锁 AI 引用洞察\n"
+    "zh-Hans": ("• 新增：一键引导添加桌面小组件（仅在你尚未添加时提示）\n"
+                "• 新增：可在「引用洞察」页面直接反馈使用建议\n"
                 "• 稳定性与性能优化"),
 }
 

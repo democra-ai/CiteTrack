@@ -638,7 +638,7 @@
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				INFOPLIST_FILE = CiteTrackWidgetExtension/WidgetInfo.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.4.2;
+				MARKETING_VERSION = 1.4.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.citetrack.CiteTrack.widget;
 				PRODUCT_NAME = CiteTrackWidgetExtension;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -663,7 +663,7 @@
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				INFOPLIST_FILE = CiteTrackWidgetExtension/WidgetInfo.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.4.2;
+				MARKETING_VERSION = 1.4.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.citetrack.CiteTrack.widget;
 				PRODUCT_NAME = CiteTrackWidgetExtension;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -832,7 +832,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
-				MARKETING_VERSION = 1.4.2;
+				MARKETING_VERSION = 1.4.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.citetrack.CiteTrack;
 				PRODUCT_NAME = CiteTrack;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -880,7 +880,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
-				MARKETING_VERSION = 1.4.2;
+				MARKETING_VERSION = 1.4.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.citetrack.CiteTrack;
 				PRODUCT_NAME = CiteTrack;
 				PROVISIONING_PROFILE_SPECIFIER = "";
