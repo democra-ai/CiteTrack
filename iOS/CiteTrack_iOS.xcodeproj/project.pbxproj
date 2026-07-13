@@ -634,7 +634,7 @@
 				CODE_SIGN_ENTITLEMENTS = CiteTrackWidgetExtension/CiteTrackWidgetExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				INFOPLIST_FILE = CiteTrackWidgetExtension/WidgetInfo.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -659,7 +659,7 @@
 				CODE_SIGN_ENTITLEMENTS = CiteTrackWidgetExtension/CiteTrackWidgetExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				INFOPLIST_FILE = CiteTrackWidgetExtension/WidgetInfo.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -809,7 +809,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_ASSET_PATHS = "\"CiteTrack/Preview Content\"";
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				ENABLE_PREVIEWS = YES;
@@ -857,7 +857,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_ASSET_PATHS = "\"CiteTrack/Preview Content\"";
 				DEVELOPMENT_TEAM = HNU7NA3S7L;
 				ENABLE_PREVIEWS = YES;

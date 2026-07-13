@@ -429,6 +429,16 @@ public class LocalizationManager: ObservableObject {
         en["feedback_email_hint"] = en["feedback_email_hint"] ?? "Leave your email if you'd like a reply."
         en["feedback_thanks"] = en["feedback_thanks"] ?? "Thanks! Your feedback was sent."
         en["feedback_error"] = en["feedback_error"] ?? "Couldn't send. Please try again."
+        // Home Screen widget nudge (Scholars tab) — shown only when no widget is installed
+        en["widget_promo_title"] = en["widget_promo_title"] ?? "Try the Home Screen widget"
+        en["widget_promo_subtitle"] = en["widget_promo_subtitle"] ?? "See your citations at a glance, right on your Home Screen."
+        en["widget_promo_cta"] = en["widget_promo_cta"] ?? "Try it"
+        en["widget_promo_howto_title"] = en["widget_promo_howto_title"] ?? "Add the CiteTrack widget"
+        en["widget_promo_howto_body"] = en["widget_promo_howto_body"] ?? "Touch and hold an empty area of your Home Screen, tap the + in the top-left, search for \u{201C}CiteTrack\u{201D}, then add the widget."
+        // Insights feedback prompt
+        en["insights_feedback_title"] = en["insights_feedback_title"] ?? "How's this working for you?"
+        en["insights_feedback_subtitle"] = en["insights_feedback_subtitle"] ?? "Analyzing your academic impact is new — tell us what would make it more useful."
+        en["insights_feedback_cta"] = en["insights_feedback_cta"] ?? "Share a suggestion"
         en["close"] = en["close"] ?? "Close"
         en["back"] = en["back"] ?? "Back"
         en["retry"] = en["retry"] ?? "Retry"
@@ -694,6 +704,16 @@ public class LocalizationManager: ObservableObject {
         zh["feedback_email_hint"] = zh["feedback_email_hint"] ?? "留下邮箱以便我们回复你。"
         zh["feedback_thanks"] = zh["feedback_thanks"] ?? "谢谢！反馈已发送。"
         zh["feedback_error"] = zh["feedback_error"] ?? "发送失败，请重试。"
+        // 桌面小组件引导（学者页）——仅在尚未添加小组件时显示
+        zh["widget_promo_title"] = zh["widget_promo_title"] ?? "试试桌面小组件"
+        zh["widget_promo_subtitle"] = zh["widget_promo_subtitle"] ?? "在主屏幕一眼看到你的引用量。"
+        zh["widget_promo_cta"] = zh["widget_promo_cta"] ?? "试一试"
+        zh["widget_promo_howto_title"] = zh["widget_promo_howto_title"] ?? "添加 CiteTrack 小组件"
+        zh["widget_promo_howto_body"] = zh["widget_promo_howto_body"] ?? "长按主屏幕空白处，点按左上角的「+」，搜索「CiteTrack」，然后添加小组件。"
+        // Insights 反馈入口
+        zh["insights_feedback_title"] = zh["insights_feedback_title"] ?? "这个功能好用吗？"
+        zh["insights_feedback_subtitle"] = zh["insights_feedback_subtitle"] ?? "「分析你的学术影响力」是新功能——告诉我们怎样能让它更好用。"
+        zh["insights_feedback_cta"] = zh["insights_feedback_cta"] ?? "提点建议"
         zh["close"] = zh["close"] ?? "关闭"
         zh["back"] = zh["back"] ?? "返回"
         zh["retry"] = zh["retry"] ?? "重试"

@@ -409,6 +409,10 @@ struct CitationInsightsView: View {
                         issuesCard
                     }
                 }
+
+                // 5. Feedback prompt — always available so users can tell us how
+                //    the impact-analysis feature is working for them.
+                GlassCard { InsightsFeedbackPrompt() }
             }
             .padding(GlassMetrics.screenPadding)
             .iPadReadableWidth()

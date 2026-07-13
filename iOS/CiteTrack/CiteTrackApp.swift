@@ -1176,6 +1176,25 @@ struct NewScholarView: View {
     @State private var confettiTrigger: Int = 0
     @State private var lastConfettiReason: String = ""
     @State private var batchDelta: Int = 0
+    // Home Screen widget nudge — only surfaced when the user has no widget installed.
+    @AppStorage("widgetPromoDismissed") private var widgetPromoDismissed = false
+    @State private var noWidgetInstalled = false
+    @State private var showWidgetHowTo = false
+
+    /// Ask WidgetKit which of our widgets are currently placed on the Home Screen.
+    /// Empty result → nudge the user to add one. On failure (e.g. Simulator) we
+    /// stay silent rather than nag.
+    private func checkWidgetInstalled() {
+        guard !widgetPromoDismissed else { return }
+        WidgetCenter.shared.getCurrentConfigurations { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let infos): noWidgetInstalled = infos.isEmpty
+                case .failure: noWidgetInstalled = false
+                }
+            }
+        }
+    }
 
     private func showEntryKitPopup(titleKey: String, descKey: String, value: Int, context: String) {
         #if canImport(SwiftEntryKit)
@@ -1441,6 +1460,15 @@ struct NewScholarView: View {
                     Text(localizationManager.localized("delete_scholar_message"))
                 }
             }
+            .onAppear { checkWidgetInstalled() }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                checkWidgetInstalled()
+            }
+            .alert(localizationManager.localized("widget_promo_howto_title"), isPresented: $showWidgetHowTo) {
+                Button(localizationManager.localized("close")) { }
+            } message: {
+                Text(localizationManager.localized("widget_promo_howto_body"))
+            }
             .overlay(loadingOverlay)
             .overlay(
                 ZStack {
@@ -1480,6 +1508,15 @@ struct NewScholarView: View {
 
     private var scholarListView: some View {
         List {
+
+            if !widgetPromoDismissed && noWidgetInstalled {
+                WidgetPromoRow(
+                    onTry: { showWidgetHowTo = true },
+                    onDismiss: { withAnimation { widgetPromoDismissed = true; noWidgetInstalled = false } }
+                )
+                .glassRow()
+                .listRowSeparator(.hidden)
+            }
 
             ForEach(dataManager.scholarsForList, id: \.id) { scholar in
                 NavigationLink(value: scholar) {
@@ -4813,6 +4850,10 @@ private struct HeatmapBlockSelectionEffect: ViewModifier {
 /// In-app feedback form. Posts to the CiteTrack feedback endpoint, which emails
 /// the team (same channel as the website). No account required.
 struct FeedbackView: View {
+    /// Optional source tag (e.g. "insights") folded into `from` so we can see
+    /// which screen the feedback came from. nil for the generic Settings entry.
+    var context: String? = nil
+
     @ObservedObject private var lm = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
 
@@ -4903,7 +4944,7 @@ struct FeedbackView: View {
             "message": msg,
             "email": email.trimmingCharacters(in: .whitespacesAndNewlines),
             "category": category,
-            "from": src,
+            "from": context.map { "\(src):\($0)" } ?? src,
             "appVersion": "\(version) (\(build))",
             "platform": plat,
         ]
@@ -4924,6 +4965,93 @@ struct FeedbackView: View {
                 }
             }
         }.resume()
+    }
+}
+
+// MARK: - Home Screen widget nudge (Scholars tab)
+/// Small, dismissible card inviting the user to add the Home Screen widget.
+/// Shown ONLY when no widget is currently installed (detected via WidgetCenter
+/// in the parent). iOS can't add a widget programmatically, so "Try it" shows
+/// the quick how-to.
+struct WidgetPromoRow: View {
+    @ObservedObject private var lm = LocalizationManager.shared
+    let onTry: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "square.grid.2x2.fill")
+                .font(.title2)
+                .foregroundStyle(.blue)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(lm.localized("widget_promo_title"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(lm.localized("widget_promo_subtitle"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            Button(action: onTry) {
+                Text(lm.localized("widget_promo_cta"))
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.tertiary)
+                    .padding(6)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Insights feedback prompt
+/// Persistent card at the bottom of the Insights screen inviting suggestions
+/// about the impact-analysis feature. Opens FeedbackView tagged "insights".
+struct InsightsFeedbackPrompt: View {
+    @ObservedObject private var lm = LocalizationManager.shared
+    @State private var showFeedback = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .foregroundStyle(.blue)
+                Text(lm.localized("insights_feedback_title"))
+                    .font(.subheadline.weight(.semibold))
+            }
+            Text(lm.localized("insights_feedback_subtitle"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                showFeedback = true
+            } label: {
+                Label(lm.localized("insights_feedback_cta"), systemImage: "square.and.pencil")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sheet(isPresented: $showFeedback) {
+            NavigationStack {
+                FeedbackView(context: "insights")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(lm.localized("close")) { showFeedback = false }
+                        }
+                    }
+            }
+        }
     }
 }
 
