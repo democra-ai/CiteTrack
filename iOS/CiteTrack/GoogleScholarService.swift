@@ -220,11 +220,14 @@ public class GoogleScholarService: ObservableObject {
     private func isBlockedPage(_ html: String) -> Bool {
         if html.isEmpty { return true }
         let lower = html.lowercased()
-        let needles = ["gs_captcha", "g-recaptcha", "recaptcha", "/sorry/",
-                       "unusual traffic", "captcha-form", "please show you're not a robot"]
+        // A genuine profile page always carries BOTH the name element and the stats
+        // table. If both are present it is real — even if a paper title happens to
+        // contain "captcha"/"recaptcha"/"unusual traffic" (checking needles first would
+        // wrongly flag such profiles and silently stop them from ever updating).
+        if lower.contains("gsc_prf_in") && lower.contains("gsc_rsb_std") { return false }
+        // Otherwise: a CAPTCHA / consent / "sorry" interstitial, or simply not a profile.
+        let needles = ["gs_captcha", "g-recaptcha", "/sorry/", "captcha-form"]
         for n in needles where lower.contains(n) { return true }
-        // A real profile always carries the name element and the stats table; if BOTH
-        // are absent on a 200 response, this isn't a profile page.
         if !lower.contains("gsc_prf_in") && !lower.contains("gsc_rsb_std") { return true }
         return false
     }

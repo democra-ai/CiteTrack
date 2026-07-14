@@ -1131,9 +1131,14 @@ struct QuickRefreshIntent: AppIntent {
                 // but not a real profile). The cookieless widget request hits these often;
                 // parsing one as success used to write a garbage/0 citation back to the app.
                 let lowerHtml = html.lowercased()
-                let blocked = html.isEmpty
-                    || ["gs_captcha", "g-recaptcha", "recaptcha", "/sorry/", "unusual traffic", "captcha-form"].contains(where: { lowerHtml.contains($0) })
-                    || (!lowerHtml.contains("gsc_prf_in") && !lowerHtml.contains("gsc_rsb_std"))
+                let blocked: Bool = {
+                    if html.isEmpty { return true }
+                    // Real profile (both markers) is never a block, even if a paper title
+                    // mentions "captcha"/"recaptcha".
+                    if lowerHtml.contains("gsc_prf_in") && lowerHtml.contains("gsc_rsb_std") { return false }
+                    if ["gs_captcha", "g-recaptcha", "/sorry/", "captcha-form"].contains(where: { lowerHtml.contains($0) }) { return true }
+                    return !lowerHtml.contains("gsc_prf_in") && !lowerHtml.contains("gsc_rsb_std")
+                }()
                 if blocked { throw NSError(domain: "Blocked", code: -429, userInfo: [NSLocalizedDescriptionKey: "rate limited / captcha"]) }
                 func firstMatch(_ pattern: String, _ text: String) -> String? {
                     guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
@@ -1263,6 +1268,10 @@ struct QuickRefreshIntent: AppIntent {
                     defaults.removeObject(forKey: "RefreshInProgress_\(scholarId)")
                     defaults.removeObject(forKey: "RefreshStartTime_\(scholarId)")
                     defaults.removeObject(forKey: "RefreshTriggerTime_\(scholarId)")
+                    // Also clear the spin-animation flag: since we no longer bump
+                    // LastRefreshTime on failure, checkRefreshCompletion won't fire to clear
+                    // it, which would otherwise suppress the spinner on the next tap.
+                    defaults.removeObject(forKey: "RefreshAnimationActive_\(scholarId)")
                     defaults.synchronize()
                     print("🔄 [Intent] ✅ 失败时已清除刷新标记")
                 }

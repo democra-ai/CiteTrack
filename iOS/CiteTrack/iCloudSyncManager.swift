@@ -1438,7 +1438,9 @@ extension iCloudSyncManager {
 				if let existing = DataManager.shared.getScholar(id: scholarId) {
 					let importedTime = updated.lastUpdated ?? .distantPast
 					let localTime = existing.lastUpdated ?? .distantPast
-					if importedTime > localTime {
+					// Newer AND a plausible (non-zero) value — never let a malformed export
+					// (missing citationCount defaults to 0) overwrite a good local count.
+					if importedTime > localTime && citationCount > 0 {
 						DataManager.shared.updateScholar(updated)
 					}
 				} else {
