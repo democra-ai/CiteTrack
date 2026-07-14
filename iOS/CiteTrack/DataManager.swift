@@ -302,8 +302,9 @@ public class DataManager: ObservableObject {
                 self.mergeLatestScholarsFromWidget()
             } else {
                 print("🧪 [DataManager] \(String(format: "debug_foreground_no_change".localized, t?.description ?? "nil"))")
-                // 即使时间没变化，也尝试一次合并，防止上次错过
-                self.mergeLatestScholarsFromWidget()
+                // No refresh happened while backgrounded → nothing to merge. (The old
+                // code merged unconditionally here, which — together with the widget's
+                // failed-refresh timestamp bump — could revert a good value.)
             }
         }
     }
@@ -317,23 +318,29 @@ public class DataManager: ObservableObject {
         var changed = false
         var updated = scholars
         for (idx, s) in scholars.enumerated() {
-            if let w = widgetScholars.first(where: { $0.id == s.id }) {
-                var newS = s
-                // 同步引用数
-                if newS.citations != w.citations {
-                    newS.citations = w.citations
-                    changed = true
-                }
-                // 同步每学者更新时间（优先按学者的 LastRefreshTime_<id>，否则用全局，最后回退 w.lastUpdated）
-                let lastKey = "LastRefreshTime_\(s.id)"
-                let perScholarTime = (UserDefaults(suiteName: appGroupIdentifier)?.object(forKey: lastKey) as? Date) ?? (UserDefaults.standard.object(forKey: lastKey) as? Date)
-                let candidateTime = perScholarTime ?? self.lastRefreshTime ?? w.lastUpdated
-                if newS.lastUpdated != candidateTime {
-                    newS.lastUpdated = candidateTime
-                    changed = true
-                }
-                updated[idx] = newS
-            }
+            guard let w = widgetScholars.first(where: { $0.id == s.id }) else { continue }
+
+            // The widget may only UPDATE the app's number when its data is BOTH:
+            //  (1) strictly newer than what the app already has (per-scholar timestamp), and
+            //  (2) a plausible, non-zero value.
+            // Previously the widget "always won" on any difference, so a stale or
+            // mis-parsed (0/garbage) widget value written by a throttled background
+            // refresh would silently revert a count the user had just refreshed correctly.
+            let lastKey = "LastRefreshTime_\(s.id)"
+            let widgetTime = (UserDefaults(suiteName: appGroupIdentifier)?.object(forKey: lastKey) as? Date)
+                ?? (UserDefaults.standard.object(forKey: lastKey) as? Date)
+            let widgetIsNewer: Bool = {
+                guard let wt = widgetTime else { return false }
+                guard let appTime = s.lastUpdated else { return true }
+                return wt > appTime
+            }()
+            guard widgetIsNewer, let wc = w.citations, wc > 0 else { continue }
+
+            var newS = s
+            var didChange = false
+            if newS.citations != wc { newS.citations = wc; didChange = true }
+            if newS.lastUpdated != widgetTime { newS.lastUpdated = widgetTime; didChange = true }
+            if didChange { updated[idx] = newS; changed = true }
         }
         if changed {
             scholars = updated

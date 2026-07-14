@@ -1786,48 +1786,42 @@ struct NewScholarView: View {
         }
         
         var totalDeltaLocal: Int = 0
-        await withTaskGroup(of: Void.self) { group in
-            for (index, scholar) in scholars.enumerated() {
-                group.addTask {
-                    // 使用安全的乘法，防止溢出
-                    let safeIndex = min(index, Int.max / 500_000_000)
-                    let nanoseconds = UInt64(safeIndex * 500_000_000)
-                    try? await Task.sleep(nanoseconds: nanoseconds)
-                    
-                    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                        scholarService.fetchScholarInfo(for: scholar.id) { result in
-                            Task { @MainActor in
-                                // 使用安全的加法，防止溢出
-                                refreshProgress = min(refreshProgress + 1, Int.max - 1)
-                                
-                                switch result {
-                                case .success(let info):
-                                    let oldCitations = dataManager.getScholar(id: scholar.id)?.citations ?? info.citations
-                                    var updatedScholar = Scholar(id: scholar.id, name: info.name)
-                                    updatedScholar.citations = info.citations
-                                    updatedScholar.lastUpdated = Date()
-                                    
-                                    dataManager.updateScholar(updatedScholar)
-                                    dataManager.saveHistoryIfChanged(
-                                        scholarId: updatedScholar.id,
-                                        citationCount: info.citations
-                                    )
-                                    // Accumulate delta only (MainActor safe)
-                                    let delta = info.citations - oldCitations
-                                    // 使用安全的加法，防止溢出
-                                    totalDeltaLocal = min(max(totalDeltaLocal + delta, Int.min + 1), Int.max - 1)
-                                    print("📈 [Batch] Accumulate delta id=\(scholar.id) old=\(oldCitations) new=\(info.citations) delta=\(delta)")
-                                    
-                                    print("✅ [批量更新] \(String(format: "debug_batch_update_success_direct_print".localized, info.name, info.citations))")
-                                    
-                                case .failure(let error):
-                                    print("❌ [批量更新] \(String(format: "debug_batch_update_failed".localized, scholar.id, error.localizedDescription))")
-                                }
-                                
-                                continuation.resume()
-                            }
-                        }
+        // Fetch scholars ONE AT A TIME with spacing. Firing every scholar in a ~0.5s
+        // burst is exactly the pattern Google Scholar answers with throttle/CAPTCHA
+        // pages, so most of a batch used to silently fail. Sequential + a small delay
+        // is far more reliable and much gentler on the endpoint.
+        for (index, scholar) in scholars.enumerated() {
+            if index > 0 { try? await Task.sleep(nanoseconds: 1_500_000_000) } // 1.5s between requests
+            let result: Result<(name: String, citations: Int), GoogleScholarService.ScholarError> =
+                await withCheckedContinuation { cont in
+                    scholarService.fetchScholarInfo(for: scholar.id) { cont.resume(returning: $0) }
+                }
+            await MainActor.run {
+                refreshProgress = min(refreshProgress + 1, Int.max - 1)
+                switch result {
+                case .success(let info):
+                    let oldCitations = dataManager.getScholar(id: scholar.id)?.citations ?? info.citations
+                    // Never let a 0 overwrite a real, non-zero count (belt-and-suspenders;
+                    // the parser now fails instead of returning 0 on a blocked page).
+                    guard info.citations > 0 || oldCitations == 0 else {
+                        print("⚠️ [批量更新] Skip suspicious 0 for id=\(scholar.id) (was \(oldCitations))")
+                        return
                     }
+                    var updatedScholar = Scholar(id: scholar.id, name: info.name)
+                    updatedScholar.citations = info.citations
+                    updatedScholar.lastUpdated = Date()
+
+                    dataManager.updateScholar(updatedScholar)
+                    dataManager.saveHistoryIfChanged(
+                        scholarId: updatedScholar.id,
+                        citationCount: info.citations
+                    )
+                    let delta = info.citations - oldCitations
+                    totalDeltaLocal = min(max(totalDeltaLocal + delta, Int.min + 1), Int.max - 1)
+                    print("📈 [Batch] id=\(scholar.id) old=\(oldCitations) new=\(info.citations) delta=\(delta)")
+                    print("✅ [批量更新] \(String(format: "debug_batch_update_success_direct_print".localized, info.name, info.citations))")
+                case .failure(let error):
+                    print("❌ [批量更新] \(String(format: "debug_batch_update_failed".localized, scholar.id, error.localizedDescription))")
                 }
             }
         }

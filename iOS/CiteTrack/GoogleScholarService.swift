@@ -125,17 +125,31 @@ public class GoogleScholarService: ObservableObject {
                 }
                 
                 let htmlString = String(data: data, encoding: .utf8) ?? ""
-                
+
+                // A blocked / CAPTCHA / consent / "unusual traffic" page comes back with
+                // HTTP 200 but is NOT a real profile. Never parse it as success — that was
+                // letting a garbage/zero value overwrite the correct citation count.
+                if self.isBlockedPage(htmlString) {
+                    print("⛔️ 被 Google Scholar 拦截（验证/限流页），放弃本次更新")
+                    completion(.failure(.rateLimited))
+                    return
+                }
+
                 // 解析学者姓名和引用数
                 let name = self.extractScholarName(from: htmlString)
-                let citations = self.extractCitationCount(from: htmlString)
-                
-                if name.isEmpty {
+                guard !name.isEmpty else {
                     print("❌ 未能解析到学者姓名")
                     completion(.failure(.scholarNotFound))
                     return
                 }
-                
+                // Fail instead of returning 0 when the real citations cell is missing:
+                // a partial/interstitial page must never overwrite a good value.
+                guard let citations = self.extractCitationCount(from: htmlString) else {
+                    print("❌ 未能解析到引用数（页面异常），放弃本次更新")
+                    completion(.failure(.parsingError))
+                    return
+                }
+
                 print("✅ 成功获取学者信息: \(name), 引用数: \(citations)")
                 
                 // 同时解析论文列表并保存到统一缓存（最大化利用页面内容）
@@ -201,39 +215,56 @@ public class GoogleScholarService: ObservableObject {
     
     // MARK: - Private Parsing Methods
     
+    /// Detects a Google Scholar CAPTCHA / consent / "unusual traffic" interstitial,
+    /// which is served with HTTP 200 and must NOT be parsed as a real profile.
+    private func isBlockedPage(_ html: String) -> Bool {
+        if html.isEmpty { return true }
+        let lower = html.lowercased()
+        let needles = ["gs_captcha", "g-recaptcha", "recaptcha", "/sorry/",
+                       "unusual traffic", "captcha-form", "please show you're not a robot"]
+        for n in needles where lower.contains(n) { return true }
+        // A real profile always carries the name element and the stats table; if BOTH
+        // are absent on a 200 response, this isn't a profile page.
+        if !lower.contains("gsc_prf_in") && !lower.contains("gsc_rsb_std") { return true }
+        return false
+    }
+
     private func extractScholarName(from html: String) -> String {
-        // 尝试多种模式来提取学者姓名
+        // Only the real profile-name element. A generic <h3> fallback used to match
+        // headings on consent / "unusual traffic" pages, making a blocked fetch look
+        // like a success — removed on purpose.
         let patterns = [
             #"<div id="gsc_prf_in">([^<]+)</div>"#,
-            #"<div class="gsc_prf_in">([^<]+)</div>"#,
-            #"<h3[^>]*>([^<]+)</h3>"#
+            #"<div[^>]*class="gsc_prf_in"[^>]*>([^<]+)</div>"#
         ]
-        
+
         for pattern in patterns {
             if let name = extractFirstMatch(from: html, pattern: pattern) {
                 return name.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
-        
+
         return ""
     }
-    
-    private func extractCitationCount(from html: String) -> Int {
-        // 尝试多种模式来提取引用数
+
+    /// Returns the total citation count, or nil when the real stats cell is absent.
+    /// Returning nil (not 0) is deliberate: the caller must fail rather than overwrite
+    /// a correct value. The old greedy fallbacks (<a>(\d+)</a>, >(\d+)<) matched an
+    /// arbitrary number anywhere on the page (a year, a per-paper count) — removed.
+    private func extractCitationCount(from html: String) -> Int? {
         let patterns = [
-            #"<td class="gsc_rsb_std">(\d+)</td>"#,
-            #"<a[^>]*>(\d+)</a>"#,
-            #">(\d+)<"#
+            #"<td[^>]*class="gsc_rsb_std"[^>]*>(\d+)</td>"#,
+            #"Citations</a></td><td[^>]*class="gsc_rsb_std"[^>]*>(\d+)</td>"#
         ]
-        
+
         for pattern in patterns {
             if let citationString = extractFirstMatch(from: html, pattern: pattern),
                let count = Int(citationString) {
                 return count
             }
         }
-        
-        return 0
+
+        return nil
     }
     
     private func extractFirstMatch(from text: String, pattern: String) -> String? {

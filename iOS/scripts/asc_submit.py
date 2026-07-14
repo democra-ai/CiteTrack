@@ -97,12 +97,12 @@ def get_or_create_version(ver):
 
 
 WHATS_NEW = {
-    "en-US": ("• New: a quick nudge to add the Home Screen widget (shown only if you don't have one yet)\n"
-              "• New: share suggestions about Citation Insights right from that screen\n"
-              "• Reliability and performance improvements"),
-    "zh-Hans": ("• 新增：一键引导添加桌面小组件（仅在你尚未添加时提示）\n"
-                "• 新增：可在「引用洞察」页面直接反馈使用建议\n"
-                "• 稳定性与性能优化"),
+    "en-US": ("• Fixed: citation counts sometimes failed to update or showed an inaccurate value\n"
+              "• Refreshes now detect Google Scholar rate-limiting and never overwrite a correct count with a wrong or zero value\n"
+              "• Gentler, more reliable batch refresh"),
+    "zh-Hans": ("• 修复：引用数有时无法更新，或显示不准确的数值\n"
+                "• 刷新时能识别 Google Scholar 的限流页面，绝不会用错误或为 0 的数值覆盖正确的引用数\n"
+                "• 批量刷新更稳、更温和"),
 }
 
 

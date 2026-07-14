@@ -1432,7 +1432,18 @@ extension iCloudSyncManager {
 				var updated = scholar
 				updated.citations = citationCount
 				updated.lastUpdated = ISO8601DateFormatter().date(from: latestEntry["timestamp"] as? String ?? "") ?? Date()
-				DataManager.shared.addScholar(updated)
+				// Upsert with newest-wins. addScholar is a no-op for an EXISTING scholar,
+				// so importing could never correct a number that was already stored — but a
+				// stale cloud value must not clobber a fresher local one either.
+				if let existing = DataManager.shared.getScholar(id: scholarId) {
+					let importedTime = updated.lastUpdated ?? .distantPast
+					let localTime = existing.lastUpdated ?? .distantPast
+					if importedTime > localTime {
+						DataManager.shared.updateScholar(updated)
+					}
+				} else {
+					DataManager.shared.addScholar(updated)
+				}
 				importedScholars += 1
 
 				for entry in scholarEntries {

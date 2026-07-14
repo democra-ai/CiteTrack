@@ -1127,6 +1127,14 @@ struct QuickRefreshIntent: AppIntent {
                     throw NSError(domain: "HTTP", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
                 }
                 let html = String(data: data, encoding: .utf8) ?? ""
+                // Reject a CAPTCHA / consent / "unusual traffic" interstitial (HTTP 200
+                // but not a real profile). The cookieless widget request hits these often;
+                // parsing one as success used to write a garbage/0 citation back to the app.
+                let lowerHtml = html.lowercased()
+                let blocked = html.isEmpty
+                    || ["gs_captcha", "g-recaptcha", "recaptcha", "/sorry/", "unusual traffic", "captcha-form"].contains(where: { lowerHtml.contains($0) })
+                    || (!lowerHtml.contains("gsc_prf_in") && !lowerHtml.contains("gsc_rsb_std"))
+                if blocked { throw NSError(domain: "Blocked", code: -429, userInfo: [NSLocalizedDescriptionKey: "rate limited / captcha"]) }
                 func firstMatch(_ pattern: String, _ text: String) -> String? {
                     guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
                     let range = NSRange(text.startIndex..., in: text)
@@ -1137,23 +1145,26 @@ struct QuickRefreshIntent: AppIntent {
                 }
                 let namePatterns = [
                     #"<div id=\"gsc_prf_in\">([^<]+)</div>"#,
-                    #"<div class=\"gsc_prf_in\">([^<]+)</div>"#,
-                    #"<h3[^>]*>([^<]+)</h3>"#
+                    #"<div[^>]*class=\"gsc_prf_in\"[^>]*>([^<]+)</div>"#
                 ]
                 var name = ""
                 for p in namePatterns { if let v = firstMatch(p, html) { name = v.trimmingCharacters(in: .whitespacesAndNewlines); break } }
+                // Only the real stats cell — the old greedy fallbacks grabbed an arbitrary
+                // number anywhere on the page. Missing cell => throw (do NOT write a 0).
                 let citationPatterns = [
-                    #"<td class=\"gsc_rsb_std\">(\d+)</td>"#,
-                    #"<a[^>]*>(\d+)</a>"#,
-                    #">(\d+)<"#
+                    #"<td[^>]*class=\"gsc_rsb_std\"[^>]*>(\d+)</td>"#,
+                    #"Citations</a></td><td[^>]*class=\"gsc_rsb_std\"[^>]*>(\d+)</td>"#
                 ]
-                var citations = 0
-                for p in citationPatterns { if let v = firstMatch(p, html), let c = Int(v) { citations = c; break } }
+                var parsed: Int? = nil
+                for p in citationPatterns { if let v = firstMatch(p, html), let c = Int(v) { parsed = c; break } }
+                guard let citations = parsed else {
+                    throw NSError(domain: "ParseError", code: -1, userInfo: [NSLocalizedDescriptionKey: "citations cell not found"])
+                }
                 if name.isEmpty { name = scholarId }
-                
+
                 // Widget Extension 无法访问 Shared 模块，所以不在这里解析论文列表
                 // 论文列表的解析和缓存由主 App 的 GoogleScholarService 处理
-                
+
                 return (name: name, citations: citations)
             }
             do {
@@ -1237,22 +1248,12 @@ struct QuickRefreshIntent: AppIntent {
                 print("✅ [Intent] 已保存引用历史记录: \(info.citations) at \(now)")
                 print("✅ [Intent] 对勾状态已立即设置完成")
             } catch {
-                let now = Date()
                 print("❌ [Intent] 后台拉取失败: sid=\(sid), error=\(error.localizedDescription)")
-                
-                // 失败也要写入完成时间并立即清理进行中标记，避免卡死
-                if let ag = UserDefaults(suiteName: groupIdentifier) { 
-                    ag.set(now, forKey: "LastRefreshTime_\(sid)")
-                    ag.set(now, forKey: "LastRefreshTime") // 失败时也更新全局
-                    ag.synchronize() 
-                    print("🧪 [Widget] AppGroup(失败) 写入 LastRefreshTime & LastRefreshTime_\(sid): \(now)")
-                }
-                UserDefaults.standard.set(now, forKey: "LastRefreshTime_\(sid)")
-                UserDefaults.standard.set(now, forKey: "LastRefreshTime") // 失败时也更新全局
-                UserDefaults.standard.synchronize()
-                print("🧪 [Widget] Standard(失败) 写入 LastRefreshTime & LastRefreshTime_\(sid): \(now)")
-                // 通知主App刷新读取
-                postDarwinNotification("com.citetrack.lastRefreshTimeUpdated")
+
+                // Do NOT bump LastRefreshTime on failure. Advertising a fresh timestamp for
+                // a refresh that got blocked/mis-parsed made the app's widget-merge treat the
+                // stale/wrong widget value as "newer" and revert the user's correct count.
+                // We only clear the in-progress/blur markers below so the widget doesn't hang.
 
                 // 🎯 修复：失败时也立即清除模糊状态
                 print("🔄 [Intent] 失败情况，立即清除模糊状态")
